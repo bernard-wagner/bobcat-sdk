@@ -44,15 +44,17 @@ Git repo and some helpers to get started quickly with testing.
 Hello world
 -----------
 
-`bobcat-sdk` with the alloc feature flag:
+This is a simple contract that writes "Hello, world!" back to the caller when invoked:
 
 .. code-block::
+
+	// src/main.rs
 
 	use bobcat_sdk::prelude::*;
 
 	#[unsafe(no_mangle)]
 	fn user_entrypoint(len: usize) -> usize {
-	    write_result_bytes(b"Hello, world!");
+	    write_str("Hello, world!");
 	}
 
 This smart contract simply writes "Hello, world!" as a string when it's invoked.
