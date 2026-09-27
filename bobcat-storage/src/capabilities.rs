@@ -1,4 +1,3 @@
-
 use core::marker::PhantomData;
 
 pub trait Cap {
@@ -11,16 +10,20 @@ macro_rules! capabilities {
         pub struct $t;
 
         impl Cap for $t {
-            fn write() -> bool { $cw }
-            fn read() -> bool { $cr }
+            fn write() -> bool {
+                $cw
+            }
+            fn read() -> bool {
+                $cr
+            }
         }
-    }
+    };
 }
 
 capabilities! {CW, true, false}
 capabilities! {CA, true, true}
 capabilities! {CR, false, true}
 
-pub struct EvmBox<C: Cap, T>{
-    _phantom: PhantomData<(C, T)>
+pub struct EvmBox<C: Cap, T> {
+    _phantom: PhantomData<(C, T)>,
 }

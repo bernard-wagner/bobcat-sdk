@@ -70,7 +70,7 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
                 0,
             )
             .unwrap();
-            write_result_word(&w);
+            write_word(&w);
         }
     }
     0

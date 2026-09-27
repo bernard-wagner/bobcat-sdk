@@ -23,7 +23,7 @@ pub enum Entry {
 pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     assert!(!unsafe { msg_reentrant() });
     flush_guard(|| match read_cd::<_>(args_len) {
-        Entry::Number => write_result_word(&storage_load(&U::ZERO)),
+        Entry::Number => write_word(&storage_load(&U::ZERO)),
         Entry::SetNumber(w) => storage_store(&U::ZERO, &w),
         Entry::MulNumber(w) => storage_wrapping_mul(&U::ZERO, &w),
         Entry::AddNumber(w) => storage_wrapping_add(&U::ZERO, &w),

@@ -34,23 +34,33 @@ pub unsafe fn mark_used() {
 }
 
 /// Write a result slice.
-pub fn write_result_slice(s: &[u8]) {
+pub fn write_slice(s: &[u8]) {
     unsafe { host::write_result(s.as_ptr(), s.len()) }
 }
 
-pub fn write_result_word(s: &U) {
-    write_result_slice(&s.0)
+#[deprecated = "Replaced by write_slice"]
+pub fn write_result_slice(x: &[u8]) {
+    write_slice(x)
 }
 
-pub fn write_result_bool(v: bool) {
-    write_result_slice(&U::from(v).0)
+pub fn write_word(s: &U) {
+    write_slice(&s.0)
+}
+
+#[deprecated = "Renamed to write_word"]
+pub fn write_result_word(x: &U) {
+    write_word(x)
+}
+
+pub fn write_bool(v: bool) {
+    write_slice(&U::from(v).0)
 }
 
 const OFFSET_ARR: [u8; 32] = U::from_u32(32).0;
 
 /// Helper function that create a fresh array with the length and offset
 /// by concatinating arrays.
-pub fn write_result_array_slice<const ARR_LEN: usize, const CD_LEN: usize>(arr: [u8; ARR_LEN]) {
+pub fn write_array_slice<const ARR_LEN: usize, const CD_LEN: usize>(arr: [u8; ARR_LEN]) {
     assert!(
         ARR_LEN + 32 * 2 == CD_LEN,
         "bad array length, need: {}",
@@ -58,16 +68,48 @@ pub fn write_result_array_slice<const ARR_LEN: usize, const CD_LEN: usize>(arr: 
     );
     let U(len_arr) = U::from_usize(ARR_LEN);
     let x: [u8; ARR_LEN] = concat_arrays!(OFFSET_ARR, len_arr, arr);
-    write_result_slice(&x)
+    write_slice(&x)
 }
 
 #[cfg(feature = "alloc")]
-pub fn write_result_array_vec(arr: Vec<u8>) {
+pub fn write_array_vec(arr: Vec<u8>) {
     let mut v = Vec::with_capacity(32 * 2 + arr.len());
     v.extend_from_slice(&U::from_usize(32).0);
     v.extend_from_slice(&U::from_usize(arr.len()).0);
     v.extend(arr);
-    write_result_slice(&v)
+    write_slice(&v)
+}
+
+/// Write the slice given as Ethereum's String/Bytes type, with the length
+/// and offset prefixed.
+#[cfg(feature = "alloc")]
+pub fn write_bytes(x: &[u8]) {
+    let mut v = Vec::with_capacity(32 * 2 + arr.len());
+    v.extend_from_slice(&U::from_usize(32).0);
+    v.extend_from_slice(&U::from_usize(arr.len()).0);
+    v.extend_from_slice(x);
+    write_slice(&v)
+}
+
+#[cfg(feature = "alloc")]
+pub fn write_string(x: String) {
+    write_array_vec(x.into_bytes())
+}
+
+/// String buffer size we use for `write_str`.
+pub const STR_BUFFER_SIZE: usize = 128 + 32 * 2;
+
+/// Write a small string, allocating a small arena (192 bytes, 128
+/// characters max to use here) for the writing.
+pub fn write_str(x: &str) {
+    let len = 64 + x.len().div_ceil(32) * 32;
+    assert!(len <= STR_BUFFER_SIZE, "str too large");
+    let mut buf = [0u8; STR_BUFFER_SIZE];
+    // 0x20 for the first word:
+    buf[31] = 0x20;
+    buf[32..32 * 2].copy_from_slice(U::from(x.len()).as_slice());
+    buf[32 * 2..32 * 2 + x.len()].copy_from_slice(x.as_bytes());
+    write_slice(&buf[..len])
 }
 
 pub fn return_data_size() -> usize {
@@ -76,7 +118,7 @@ pub fn return_data_size() -> usize {
 
 pub use bobcat_cd::leftpad_addr;
 
-/// Like write_result_exit_call, except it only reverts with the
+/// Like write_exit_call, except it only reverts with the
 /// returndata if the underlying call reverted. If it doesn't, then it
 /// just returns the slice.
 #[macro_export]
@@ -84,7 +126,7 @@ macro_rules! revert_if_bad_call_vec {
     ($e:expr) => {{
         let (rc, rd) = $e;
         if !rc {
-            $crate::write_result_slice(&rd);
+            $crate::write_slice(&rd);
             return 1;
         }
         rd
@@ -100,7 +142,7 @@ macro_rules! revert_if_bad_call_unit_vec {
         match (rc, revertdata) {
             (true, _) => (),
             (false, Some(v)) => {
-                $crate::write_result_slice(&v);
+                $crate::write_slice(&v);
                 return 1;
             }
             (false, _) => return 1,
@@ -116,7 +158,7 @@ macro_rules! revert_if_bad_call_slice_vec {
         match (rc, revertdata) {
             (true, _) => returndata,
             (false, Some(v)) => {
-                $crate::write_result_slice(&v);
+                $crate::write_slice(&v);
                 return 1;
             }
             (false, _) => return 1,
@@ -125,15 +167,15 @@ macro_rules! revert_if_bad_call_slice_vec {
 }
 
 #[macro_export]
-macro_rules! write_result_exit_res {
+macro_rules! write_exit_res {
     ($ident:expr) => {{
         match $ident {
             Ok(v) => {
-                $crate::write_result_slice(&v);
+                $crate::write_slice(&v);
                 0
             }
             Err(v) => {
-                $crate::write_result_slice(&v);
+                $crate::write_slice(&v);
                 1
             }
         }
@@ -141,24 +183,24 @@ macro_rules! write_result_exit_res {
 }
 
 #[macro_export]
-macro_rules! write_result_exit_create {
+macro_rules! write_exit_create {
     ($ident:expr) => {{
         let (addr, b, i) = $ident;
         if addr != [0u8; 20] {
-            $crate::write_result_slice(&leftpad_addr(addr));
+            $crate::write_slice(&leftpad_addr(addr));
             0
         } else {
-            $crate::write_result_slice(&b[..i]);
+            $crate::write_slice(&b[..i]);
             1
         }
     }};
 }
 
 #[macro_export]
-macro_rules! write_result_exit_call {
+macro_rules! write_exit_call {
     ($ident:expr) => {{
         let (rc, l, v) = $ident;
-        $crate::write_result_slice(&v[..l]);
+        $crate::write_slice(&v[..l]);
         if rc { 0 } else { 1 }
     }};
 }

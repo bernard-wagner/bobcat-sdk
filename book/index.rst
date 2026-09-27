@@ -1,17 +1,16 @@
-.. The Bobcat-sdk Book documentation master file, created by
-   sphinx-quickstart on Sun Sep 27 16:41:36 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-The Bobcat-sdk Book documentation
-=================================
+===================
+The Bobcat-sdk Book
+===================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+.. image:: ../logo.svg
+   :width: 100px
 
+The Bobcat-sdk Book is a guide on developing with `bobcat-sdk`, a Rust SDK for building
+Arbitrum-based Web3 dApps. It assumes familiarity with Rust and Solidity.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Introduction
 
+   getting-started

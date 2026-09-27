@@ -25,12 +25,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "serde")]
 use serde::{
-    Deserialize as SerdeDeserialize,
-    Deserializer as SerdeDeserializer,
-    Serialize as SerdeSerialize,
-    Serializer as SerdeSerializer,
+    Deserialize as SerdeDeserialize, Deserializer as SerdeDeserializer,
+    Serialize as SerdeSerialize, Serializer as SerdeSerializer,
 };
-
 
 #[cfg(feature = "proptest")]
 pub mod strategies;

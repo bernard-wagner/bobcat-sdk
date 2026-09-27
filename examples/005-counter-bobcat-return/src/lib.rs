@@ -24,6 +24,8 @@ pub enum Entry {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     assert!(!unsafe { msg_reentrant() });
+    write_str("Hello, world!");
+    return 0;
     flush_guard(|| bobcat_rd_match! {
         read_cd::<_>(args_len);
         Entry::Number => storage_load(&U::ZERO),

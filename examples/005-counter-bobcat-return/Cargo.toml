@@ -4,7 +4,7 @@ version = "0.1.11"
 edition = "2024"
 
 [dependencies]
-bobcat-return = "0.1.2"
+bobcat-return = "0.1.4"
 bobcat-sdk = { workspace = true, features = ["panic"] }
 
 [[bin]]

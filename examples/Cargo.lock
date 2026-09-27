@@ -166,9 +166,9 @@ dependencies = [
 
 [[package]]
 name = "bobcat-return"
-version = "0.1.2"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db55dfd187588419b1ac9e07dc02ff8efeda28350293b2b28cbbc85ff7ac7945"
+checksum = "96d0dcb6ff2489ed77809bb836eb9c65c62d50876a9bceacccfdf381ecf9180a"
 dependencies = [
  "array-concat",
  "bobcat-cd",
