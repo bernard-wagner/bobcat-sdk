@@ -1,0 +1,15 @@
+[package]
+name = "bobcat-sdk-examples-005"
+version = "0.1.11"
+edition = "2024"
+
+[dependencies]
+bobcat-return = "0.1.2"
+bobcat-sdk = { workspace = true, features = ["panic"] }
+
+[[bin]]
+name = "bobcat-sdk-examples-001"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["lib", "cdylib"]

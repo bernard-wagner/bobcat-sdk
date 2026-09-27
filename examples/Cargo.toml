@@ -3,11 +3,17 @@ resolver = "3"
 members = [
     "001-counter",
     "002-mul_div",
-    "003-camelot-swapping"
+    "003-camelot-swapping",
+    "005-counter-bobcat-return"
 ]
 
 [workspace.dependencies]
 bobcat-sdk.path = "../bobcat-sdk"
+
+[patch.crates-io]
+bobcat-cd.path = "../bobcat-cd"
+bobcat-entry.path = "../bobcat-entry"
+bobcat-maths.path = "../bobcat-maths"
 
 [profile.release]
 codegen-units = 1
