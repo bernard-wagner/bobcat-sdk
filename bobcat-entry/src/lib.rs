@@ -4,7 +4,7 @@
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 pub use bobcat_maths::U;
 
@@ -84,9 +84,9 @@ pub fn write_array_vec(arr: Vec<u8>) {
 /// and offset prefixed.
 #[cfg(feature = "alloc")]
 pub fn write_bytes(x: &[u8]) {
-    let mut v = Vec::with_capacity(32 * 2 + arr.len());
+    let mut v = Vec::with_capacity(32 * 2 + x.len());
     v.extend_from_slice(&U::from_usize(32).0);
-    v.extend_from_slice(&U::from_usize(arr.len()).0);
+    v.extend_from_slice(&U::from_usize(x.len()).0);
     v.extend_from_slice(x);
     write_slice(&v)
 }

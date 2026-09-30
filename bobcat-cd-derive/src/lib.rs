@@ -55,6 +55,9 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
     );
     let slice_lifetime = fresh_lifetime_ident(&input.generics, "__evm_cd_slice");
     let field_types = all_field_types(&input.data);
+    for ty in &field_types {
+        validate_fixed_bytes_type(ty)?;
+    }
     let trait_path = trait_path(direction, &cd);
     let generics = add_field_bounds(input.generics.clone(), &field_types, &trait_path);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -332,6 +335,60 @@ fn all_field_types(data: &Data) -> Vec<Type> {
             .flat_map(|variant| variant.fields.iter().map(|field| field.ty.clone()))
             .collect(),
         Data::Union(_) => Vec::new(),
+    }
+}
+
+fn validate_fixed_bytes_type(ty: &Type) -> syn::Result<()> {
+    match ty {
+        Type::Array(array) => {
+            let is_u8 = matches!(
+                array.elem.as_ref(),
+                Type::Path(elem)
+                    if elem.qself.is_none()
+                        && elem.path.segments.last().is_some_and(|segment| segment.ident == "u8")
+            );
+            if is_u8 {
+                let len = match &array.len {
+                    syn::Expr::Lit(lit) => match &lit.lit {
+                        syn::Lit::Int(int) => int.base10_parse::<usize>().ok(),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if len.is_some_and(|len| !(1..=32).contains(&len)) {
+                    return Err(syn::Error::new_spanned(
+                        &array.len,
+                        "fixed byte arrays must contain between 1 and 32 bytes",
+                    ));
+                }
+            }
+            validate_fixed_bytes_type(&array.elem)
+        }
+        Type::Path(path) => {
+            for segment in &path.path.segments {
+                let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+                    continue;
+                };
+                for argument in &arguments.args {
+                    if let syn::GenericArgument::Type(ty) = argument {
+                        validate_fixed_bytes_type(ty)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+        Type::Group(group) => validate_fixed_bytes_type(&group.elem),
+        Type::Paren(paren) => validate_fixed_bytes_type(&paren.elem),
+        Type::Ptr(pointer) => validate_fixed_bytes_type(&pointer.elem),
+        Type::Reference(reference) => validate_fixed_bytes_type(&reference.elem),
+        Type::Slice(slice) => validate_fixed_bytes_type(&slice.elem),
+        Type::Tuple(tuple) => {
+            for elem in &tuple.elems {
+                validate_fixed_bytes_type(elem)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
     }
 }
 
@@ -1129,6 +1186,42 @@ mod tests {
     fn abi(ty: &str) -> String {
         let ty: Type = syn::parse_str(ty).unwrap();
         String::from_utf8(abi_type_name(&ty).expect("should resolve")).unwrap()
+    }
+
+    #[test]
+    fn derives_reject_fixed_byte_arrays_larger_than_one_word() {
+        let input: DeriveInput = syn::parse_str("struct TooWide { value: [u8; 33] }").unwrap();
+
+        let error = expand(input, Direction::Serialise).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "fixed byte arrays must contain between 1 and 32 bytes",
+        );
+    }
+
+    #[test]
+    fn derives_reject_oversized_fixed_bytes_nested_in_containers() {
+        let input: DeriveInput =
+            syn::parse_str("struct TooWide { values: Vec<[u8; 33]> }").unwrap();
+
+        let error = expand(input, Direction::Deserialise).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "fixed byte arrays must contain between 1 and 32 bytes",
+        );
+    }
+
+    #[test]
+    fn derives_accept_fixed_byte_arrays_up_to_one_word() {
+        for source in [
+            "struct OneByte { value: [u8; 1] }",
+            "struct OneWord { value: [u8; 32] }",
+        ] {
+            let input: DeriveInput = syn::parse_str(source).unwrap();
+            expand(input, Direction::Serialise).unwrap();
+        }
     }
 
     #[test]

@@ -80,7 +80,8 @@ Inferred ABI names include:
 
 - `bobcat_maths::U` as `uint256`;
 
-- `[u8; N]` as `bytesN`;
+- `[u8; N]` as `bytesN`, where `N` must be between 1 and 32; literal
+  lengths outside that range are rejected by the derive;
 
 - `Address` as `address` (left-padded to an ABI word);
 
