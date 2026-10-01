@@ -18,7 +18,7 @@ name = "bobcat_interfaces"
 
 [dependencies]
 array-concat.workspace = true
-bobcat-cd = { version = "0.11.4", path = "../bobcat-cd", default-features = false }
+bobcat-cd = { version = "0.11.4", path = "../bobcat-cd", default-features = false, features = ["derive"] }
 bobcat-maths = { version = "0.11.4", path = "../bobcat-maths", default-features = false }
 bobcat-storage = { version = "0.11.4", path = "../bobcat-storage", default-features = false }
 const-hex.workspace = true
