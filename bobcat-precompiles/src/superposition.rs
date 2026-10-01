@@ -33,7 +33,7 @@ pub const ADDR_EDVERIFY: [u8; 20] = address!(b"c3e443be2cfa4f41a5f5e4978d012847d
 pub const ADDR_MUL_DIV: [u8; 20] = address!(b"7a9579a78d6ea3279b33d6d0f92a2fe8fd0e2662");
 
 /// Sha512 is deployed at this address on Arbitrum One and Superposition.
-pub const ADDR_SHA512: [u8; 20] = address!(b"1f4350205a556587ff3a1f2cb627613685dacb73");
+pub const ADDR_SHA512: [u8; 20] = address!(b"d6cf26df204184fc9c3f2c47c36b04eb631ecf1f");
 
 /// A rooti function is deployed at this address.
 pub const ADDR_ROOTI: [u8; 20] = address!(b"e0efe3de50d40452bc53317e16a1b69764e2b1b2");
