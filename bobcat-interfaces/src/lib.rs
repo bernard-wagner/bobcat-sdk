@@ -11,6 +11,9 @@ pub mod camelotv3_swap_router;
 pub mod compound_v3;
 pub mod morpho;
 pub mod robinhood_stock_tokens;
+pub mod uniswap_v2;
+pub mod uniswap_v3;
+pub mod uniswap_v4;
 
 pub mod chainlink_price_feed;
 pub mod chainlink_vrf;
