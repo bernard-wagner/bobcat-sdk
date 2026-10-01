@@ -9,7 +9,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Generics, Type, parse_macro_input};
 
-#[proc_macro_derive(EvmCdSerialise, attributes(evm_values, evm_selector, evm_selector))]
+#[proc_macro_derive(EvmCdSerialise, attributes(evm_values, evm_selector))]
 pub fn derive_evm_cd_serialise(input: TokenStream) -> TokenStream {
     expand(
         parse_macro_input!(input as DeriveInput),
@@ -19,7 +19,7 @@ pub fn derive_evm_cd_serialise(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_derive(EvmCdDeserialise, attributes(evm_values, evm_selector, evm_selector))]
+#[proc_macro_derive(EvmCdDeserialise, attributes(evm_values, evm_selector))]
 pub fn derive_evm_cd_deserialise(input: TokenStream) -> TokenStream {
     expand(
         parse_macro_input!(input as DeriveInput),

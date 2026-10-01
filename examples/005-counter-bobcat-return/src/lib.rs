@@ -11,7 +11,7 @@ unsafe extern "C" {
 }
 
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 pub enum Entry {
     Number,
     SetNumber(U),

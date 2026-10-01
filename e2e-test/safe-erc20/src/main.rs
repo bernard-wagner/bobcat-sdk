@@ -9,7 +9,7 @@ bobcat_allocator!();
 pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     let args = &read_args_safe!(args_len, { 32 + 4 });
     let target = read_words!(&args[4..], 1);
-    write_result_word(
+    write_word(
         &safe_call_bool(
             target.into(),
             &interfaces::eip20::make_fn_transfer(msg_sender(), &U::from(100u32)),

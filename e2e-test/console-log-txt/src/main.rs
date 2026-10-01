@@ -14,6 +14,6 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     let (x, y) = read_words!(&args[4..], 2);
     let z = x + y;
     console!(x, y, z);
-    write_result_word(&z);
+    write_word(&z);
     0
 }

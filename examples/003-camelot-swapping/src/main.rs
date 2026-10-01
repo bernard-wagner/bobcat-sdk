@@ -24,7 +24,7 @@ const SWAP_ROUTER: [u8; 20] =
     };
 
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 pub enum Entry {
     MakeSwap(EvmCdAddress, EvmCdAddress, U, U),
 }

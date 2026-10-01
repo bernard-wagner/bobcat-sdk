@@ -6,7 +6,7 @@ use bobcat_sdk::prelude::*;
 bobcat_allocator!();
 
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 pub enum Entry {
     Number,
     SetNumber(U),
@@ -19,7 +19,7 @@ pub enum Entry {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn user_entrypoint(len: usize) -> usize {
     flush_guard(|| match read_cd::<Entry>(len) {
-        Entry::Number => write_result_word(&storage_load(&U::ZERO)),
+        Entry::Number => write_word(&storage_load(&U::ZERO)),
         Entry::SetNumber(w) => storage_store(&U::ZERO, &w),
         Entry::MulNumber(w) => storage_wrapping_mul(&U::ZERO, &w),
         Entry::AddNumber(w) => storage_wrapping_add(&U::ZERO, &w),

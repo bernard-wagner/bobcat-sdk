@@ -8,7 +8,7 @@ use bobcat_sdk::{
 };
 
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 pub enum Entry {
     Hello(U, U),
 }

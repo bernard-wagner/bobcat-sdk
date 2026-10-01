@@ -555,7 +555,7 @@ fn feature_set_i(index: usize, value: bool) {
 pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     let args = &read_args_safe!(args_len, { (32 * 2) + 4 });
     flush_guard(|| match args[..4].try_into().unwrap() {
-        SEL_FEATURES => write_result_word(&FEATURE_PACK!(
+        SEL_FEATURES => write_word(&FEATURE_PACK!(
             F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, F14, F15, F16, F17, F18, F19,
             F20, F21, F22, F23, F24, F25, F26, F27, F28, F29, F30, F31, F32, F33, F34, F35, F36,
             F37, F38, F39, F40, F41, F42, F43, F44, F45, F46, F47, F48, F49, F50, F51, F52, F53,
@@ -582,7 +582,7 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
         }
         SEL_GET_FEATURE => {
             let f_no = read_words!(&args[4..], 1);
-            write_result_word(&feature_get_i((*f_no).into()).into())
+            write_word(&feature_get_i((*f_no).into()).into())
         }
         SEL_COPY_FEATURES => {
             let target = read_words!(&args[4..], 1);

@@ -13,7 +13,7 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     let args = &read_args_safe!(args_len, { 4 + 32 });
     let addr: U = args[4..].try_into().unwrap();
     let code = make_metamorphic_proxy(addr.into());
-    write_result_word(
+    write_word(
         &match args[..4].try_into().unwrap() {
             SEL_DEPLOY => create2_pre_unit(&code, U::ZERO, &msg_sender()).unwrap(),
             SEL_PREDICT => {

@@ -33,12 +33,12 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     match args[..4].try_into().unwrap() {
         SEL_ECRECOVER => {
             let (hash, v, r, s) = read_words!(&args[4..], 4);
-            write_result_word(&ecrecover_post(*hash, (*v).into(), *r, *s).unwrap().into());
+            write_word(&ecrecover_post(*hash, (*v).into(), *r, *s).unwrap().into());
             0
         }
         SEL_SECP256R1 => {
             let (h, r, s, qx, qy) = read_words!(&args[4..], 5);
-            write_result_word(&secp256r1_post(*h, *r, *s, *qx, *qy).unwrap());
+            write_word(&secp256r1_post(*h, *r, *s, *qx, *qy).unwrap());
             0
         }
         SEL_CREATE_ED25519 => {

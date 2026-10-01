@@ -18,11 +18,12 @@ official stylus-sdk repository first.
 
 ### AI notice
 
-Parts of this codebase is AI written. The two offenders are `bobcat-cd-derive`,
-`bobcat-trace-derive` and `bobcat-cd`. We don't understand the code very well (both are proc-macros that
-manipulate the AST with derive), but it seeems to work with some testing and use
-internally. The stakes are very low with `bobcat-trace-derive`, it annotates everything in
-a function with a trace.
+Parts of this codebase are AI written. The two main offenders are `bobcat-cd-derive`,
+`bobcat-trace-derive` and `bobcat-cd`. We don't understand the code very well (both are
+proc-macros that manipulate the AST with derive), but it seeems to work with some testing
+and use internally. The interface code at bobcat-interfaces/src/uniswap_v*.rs is also AI
+written. In these places we don't touch the code. The stakes are very low with
+`bobcat-trace-derive`, it annotates everything in a function with a trace.
 
 ## Usage (with standard EVM calldata)
 
@@ -42,7 +43,7 @@ unsafe extern "C" {
 }
 
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 pub enum Entry {
     Number,
     SetNumber(U),
@@ -56,7 +57,7 @@ pub enum Entry {
 pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     assert!(!unsafe { msg_reentrant() });
     flush_guard(|| match read_cd::<_>(args_len) {
-        Entry::Number => write_result_word(&storage_load(&U::ZERO)),
+        Entry::Number => write_word(&storage_load(&U::ZERO)),
         Entry::SetNumber(w) => storage_store(&U::ZERO, &w),
         Entry::MulNumber(w) => storage_wrapping_mul(&U::ZERO, &w),
         Entry::AddNumber(w) => storage_wrapping_add(&U::ZERO, &w),

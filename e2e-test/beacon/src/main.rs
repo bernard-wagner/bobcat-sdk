@@ -22,5 +22,5 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
     }
     let beacon = read_words!(&args[4..], 1);
     let r = create1_slice::<1024>(&make_beacon_proxy(beacon.into()), U::ZERO);
-    write_result_exit_create!(r)
+    write_exit_create!(r)
 }

@@ -5,7 +5,7 @@ use bobcat_cd::{
 };
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum Call {
     Store(EvmCdAddress, EvmCdArray<u16, 0, 3>),
     SetCount(usize),
