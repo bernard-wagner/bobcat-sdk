@@ -23,7 +23,7 @@ struct Swag {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum Message {
     Ping,
     Tuple(u16, u8),
@@ -31,7 +31,7 @@ enum Message {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum CustomSelector {
     #[evm_selector("NUMBER()")]
     Number,
@@ -56,7 +56,7 @@ enum SparseAsset {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum AssetCall {
     SetAsset(Asset),
 }
@@ -68,7 +68,7 @@ enum Treat {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum DogCommand {
     DogsInHotel,
     EnrollDogInHotel(Name),
@@ -82,7 +82,7 @@ struct DogRecord {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum RecordCommand {
     Save(DogRecord),
     AwkwardNames { writer: u8, tail_offset: u8 },
@@ -104,7 +104,7 @@ struct GenericNameCollision<__EvmCdWriter, __EvmCdReader> {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum SelectorCollision {
     XMLHttp(u8),
     XmlHttp(u8),
@@ -124,7 +124,7 @@ struct SolveArgs {
 }
 
 #[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum SolverCall {
     Solve(SolveArgs),
 }
@@ -349,7 +349,7 @@ fn derived_values_compose_through_generic_vec_like_borsh() {
 }
 
 #[test]
-fn evm_entrypoint_prefixes_selector_and_preserves_vec_u8_as_bytes() {
+fn evm_selector_prefixes_selector_and_preserves_vec_u8_as_bytes() {
     let value = SolverCall::Solve(SolveArgs {
         from: vec![FromArgs {
             asset: Asset::USDC,
@@ -393,7 +393,7 @@ fn preserves_generics_and_where_clauses() {
 }
 
 #[test]
-fn evm_entrypoint_variants_can_override_their_selector_signature() {
+fn evm_selector_variants_can_override_their_selector_signature() {
     let cases = [CustomSelector::Number, CustomSelector::SetNumber(7)];
     let signatures: [&[u8]; 2] = [b"NUMBER()", b"store(uint32)"];
 

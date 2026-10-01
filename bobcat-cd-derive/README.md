@@ -23,19 +23,19 @@ pub enum Asset {
 }
 ```
 
-To derive a top-level EVM function-call sum type, add `#[evm_entrypoint]` to an
+To derive a top-level EVM function-call sum type, add `#[evm_selector]` to an
 enum:
 
 ```rust
 #[derive(EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum DogsHotelCalifornia {
     DogsInHotel,
     EnrollDogInHotel(EvmCdString<0, 100>),
 }
 ```
 
-For an `evm_entrypoint` enum:
+For an `evm_selector` enum:
 
 - the Rust variant name is converted to lower camel case unless the variant has
   an explicit `#[evm_selector("function(type,...)")]` signature;
@@ -50,7 +50,7 @@ function signature and is hashed to a four-byte literal during macro expansion:
 
 ```rust
 #[derive(EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum Entry {
     #[evm_selector("NUMBER()")]
     Number,
@@ -70,7 +70,7 @@ form is intended only for fieldless enums.
 
 `#[evm_values]` remains accepted on structs and fieldless enums for source
 compatibility, but is now redundant because selector-free value encoding is the
-default. It cannot be combined with `#[evm_entrypoint]`.
+default. It cannot be combined with `#[evm_selector]`.
 
 Inferred ABI names include:
 
@@ -119,7 +119,7 @@ enum DogTreat {
 }
 
 #[derive(Debug, PartialEq, EvmCdSerialise, EvmCdDeserialise)]
-#[evm_entrypoint]
+#[evm_selector]
 enum DogsHotelCalifornia {
     DogsInHotel,
     EnrollDogInHotel(DogName),
@@ -143,5 +143,5 @@ assert_eq!(decoded, command);
 ```
 
 Derived structs concatenate their fields and do not add a selector of their
-own. A selector is added only by an `#[evm_entrypoint]` enum variant, which
+own. A selector is added only by an `#[evm_selector]` enum variant, which
 supplies the function name and argument list.

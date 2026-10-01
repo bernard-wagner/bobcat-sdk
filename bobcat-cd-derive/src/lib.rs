@@ -9,7 +9,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Generics, Type, parse_macro_input};
 
-#[proc_macro_derive(EvmCdSerialise, attributes(evm_values, evm_entrypoint, evm_selector))]
+#[proc_macro_derive(EvmCdSerialise, attributes(evm_values, evm_selector, evm_selector))]
 pub fn derive_evm_cd_serialise(input: TokenStream) -> TokenStream {
     expand(
         parse_macro_input!(input as DeriveInput),
@@ -19,7 +19,7 @@ pub fn derive_evm_cd_serialise(input: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_derive(EvmCdDeserialise, attributes(evm_values, evm_entrypoint, evm_selector))]
+#[proc_macro_derive(EvmCdDeserialise, attributes(evm_values, evm_selector, evm_selector))]
 pub fn derive_evm_cd_deserialise(input: TokenStream) -> TokenStream {
     expand(
         parse_macro_input!(input as DeriveInput),
@@ -39,11 +39,11 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
     let cd = bobcat_cd_path()?;
     let name = &input.ident;
     let evm_values = has_evm_values(&input)?;
-    let evm_entrypoint = has_evm_entrypoint(&input)?;
-    if evm_values && evm_entrypoint {
+    let evm_selector = has_evm_selector(&input)?;
+    if evm_values && evm_selector {
         return Err(syn::Error::new_spanned(
             &input.ident,
-            "`evm_values` and `evm_entrypoint` cannot be used together",
+            "`evm_values` and `evm_selector` cannot be used together",
         ));
     }
     let io_ident = fresh_type_ident(
@@ -65,10 +65,10 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
     let body = match (&input.data, direction) {
         (Data::Struct(data), Direction::Serialise) => serialise_struct(data, &cd),
         (Data::Struct(data), Direction::Deserialise) => deserialise_struct(data, &cd),
-        (Data::Enum(data), Direction::Serialise) if evm_entrypoint => {
+        (Data::Enum(data), Direction::Serialise) if evm_selector => {
             serialise_enum(name, data, &cd)?
         }
-        (Data::Enum(data), Direction::Deserialise) if evm_entrypoint => {
+        (Data::Enum(data), Direction::Deserialise) if evm_selector => {
             deserialise_enum(name, data, &cd)?
         }
         (Data::Enum(data), Direction::Serialise) => serialise_enum_value(name, data, &cd, true)?,
@@ -86,7 +86,7 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
     let abi_methods = abi_methods(&input.data, direction, &trait_path, &cd, &io_ident);
     let value_method = match (&input.data, direction) {
         (Data::Enum(data), Direction::Serialise) => {
-            let body = serialise_enum_value(name, data, &cd, !evm_entrypoint)?;
+            let body = serialise_enum_value(name, data, &cd, !evm_selector)?;
             quote! {
                 fn serialise_value<#io_ident: #cd::serialisation::Write>(
                     &self,
@@ -97,7 +97,7 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
             }
         }
         (Data::Enum(data), Direction::Deserialise) => {
-            let body = deserialise_enum_value(name, data, &cd, !evm_entrypoint)?;
+            let body = deserialise_enum_value(name, data, &cd, !evm_selector)?;
             quote! {
                 fn deserialise_value<#io_ident: #cd::serialisation::Read>(
                     reader: &mut #io_ident,
@@ -112,7 +112,7 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
     let buffer_type = match direction {
         Direction::Serialise => TokenStream2::new(),
         Direction::Deserialise => {
-            deserialise_buffer_type(&input.data, evm_entrypoint, &trait_path, &cd)
+            deserialise_buffer_type(&input.data, evm_selector, &trait_path, &cd)
         }
     };
     let to_evm_array_method = match (&input.data, direction) {
@@ -234,30 +234,30 @@ fn has_evm_values(input: &DeriveInput) -> syn::Result<bool> {
     Ok(true)
 }
 
-fn has_evm_entrypoint(input: &DeriveInput) -> syn::Result<bool> {
+fn has_evm_selector(input: &DeriveInput) -> syn::Result<bool> {
     let mut attributes = input
         .attrs
         .iter()
-        .filter(|attribute| attribute.path().is_ident("evm_entrypoint"));
+        .filter(|attribute| attribute.path().is_ident("evm_selector"));
     let Some(attribute) = attributes.next() else {
         return Ok(false);
     };
     if !matches!(attribute.meta, syn::Meta::Path(_)) {
         return Err(syn::Error::new_spanned(
             attribute,
-            "`evm_entrypoint` does not accept arguments",
+            "`evm_selector` does not accept arguments",
         ));
     }
     if let Some(duplicate) = attributes.next() {
         return Err(syn::Error::new_spanned(
             duplicate,
-            "duplicate `evm_entrypoint` attribute",
+            "duplicate `evm_selector` attribute",
         ));
     }
     if !matches!(input.data, Data::Enum(_)) {
         return Err(syn::Error::new_spanned(
             attribute,
-            "`evm_entrypoint` is only supported on enums",
+            "`evm_selector` is only supported on enums",
         ));
     }
     Ok(true)
@@ -421,17 +421,17 @@ fn field_accesses(fields: &Fields) -> Vec<syn::Member> {
 
 fn deserialise_buffer_type(
     data: &Data,
-    evm_entrypoint: bool,
+    evm_selector: bool,
     trait_path: &TokenStream2,
     cd: &TokenStream2,
 ) -> TokenStream2 {
-    if matches!(data, Data::Enum(_)) && !evm_entrypoint {
+    if matches!(data, Data::Enum(_)) && !evm_selector {
         return quote! {
             type Buffer = #cd::serialisation::EvmCdBuffer<[u8; 32]>;
         };
     }
 
-    let mut storage = if evm_entrypoint {
+    let mut storage = if evm_selector {
         quote!([u8; 4])
     } else {
         quote!(())
@@ -904,13 +904,13 @@ fn validate_enum(data: &DataEnum, evm_values: bool) -> syn::Result<()> {
         if evm_values && !matches!(variant.fields, Fields::Unit) {
             return Err(syn::Error::new_spanned(
                 variant,
-                "EVM value enums may only contain fieldless variants; add #[evm_entrypoint] if this enum represents function calls",
+                "EVM value enums may only contain fieldless variants; add #[evm_selector] if this enum represents function calls",
             ));
         }
         if !evm_values && variant.discriminant.is_some() {
             return Err(syn::Error::new_spanned(
                 variant,
-                "explicit enum discriminants are not supported on #[evm_entrypoint] enums; entrypoint variants are encoded by declaration order when nested",
+                "explicit enum discriminants are not supported on #[evm_selector] enums; entrypoint variants are encoded by declaration order when nested",
             ));
         }
     }
