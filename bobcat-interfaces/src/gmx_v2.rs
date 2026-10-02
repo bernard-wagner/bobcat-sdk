@@ -8,7 +8,7 @@ extern crate alloc;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-use bobcat_cd::{EvmCdAddress, EvmCdSerialise};
+use bobcat_cd::{EvmCdAddress, EvmCdArray, EvmCdSerialise};
 use bobcat_maths::U;
 
 /// An EVM address.
@@ -41,17 +41,17 @@ pub enum DecreasePositionSwapType {
     SwapCollateralTokenToPnlToken = 2,
 }
 
-/// Address fields from GMX's `CreateOrderParamsAddresses`, borrowing a
+/// Address fields from GMX's `CreateOrderParamsAddresses`, owning a
 /// compile-time-sized swap path without requiring an allocator.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct OrderAddresses<'a, const SWAP_PATH_LEN: usize> {
+pub struct OrderAddresses<const SWAP_PATH_LEN: usize> {
     pub receiver: Address,
     pub cancellation_receiver: Address,
     pub callback_contract: Address,
     pub ui_fee_receiver: Address,
     pub market: Address,
     pub initial_collateral_token: Address,
-    pub swap_path: &'a [EvmCdAddress; SWAP_PATH_LEN],
+    pub swap_path: [EvmCdAddress; SWAP_PATH_LEN],
 }
 
 /// Address fields from GMX's `CreateOrderParamsAddresses`, owning the swap path.
@@ -82,8 +82,8 @@ pub struct OrderNumbers {
 
 /// Shared inputs for GMX increase and decrease orders without allocation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct OrderParams<'a, const SWAP_PATH_LEN: usize> {
-    pub addresses: OrderAddresses<'a, SWAP_PATH_LEN>,
+pub struct OrderParams<const SWAP_PATH_LEN: usize> {
+    pub addresses: OrderAddresses<SWAP_PATH_LEN>,
     pub numbers: OrderNumbers,
     pub decrease_position_swap_type: DecreasePositionSwapType,
     pub is_long: bool,
@@ -195,10 +195,14 @@ fn derived_order_numbers(numbers: OrderNumbers) -> DerivedOrderNumbers {
     }
 }
 
-fn derived_create_order_params_slice<'a, const SWAP_PATH_LEN: usize, OrderType>(
-    params: OrderParams<'a, SWAP_PATH_LEN>,
+fn derived_create_order_params_array<const SWAP_PATH_LEN: usize, OrderType>(
+    params: OrderParams<SWAP_PATH_LEN>,
     order_type: OrderType,
-) -> DerivedCreateOrderParams<&'a [EvmCdAddress], &'static [[u8; 32]], OrderType> {
+) -> DerivedCreateOrderParams<
+    EvmCdArray<EvmCdAddress, SWAP_PATH_LEN, SWAP_PATH_LEN>,
+    EvmCdArray<[u8; 32], 0, 0>,
+    OrderType,
+> {
     DerivedCreateOrderParams {
         addresses: DerivedOrderAddresses {
             receiver: EvmCdAddress::new(params.addresses.receiver),
@@ -207,7 +211,8 @@ fn derived_create_order_params_slice<'a, const SWAP_PATH_LEN: usize, OrderType>(
             ui_fee_receiver: EvmCdAddress::new(params.addresses.ui_fee_receiver),
             market: EvmCdAddress::new(params.addresses.market),
             initial_collateral_token: EvmCdAddress::new(params.addresses.initial_collateral_token),
-            swap_path: params.addresses.swap_path.as_slice(),
+            swap_path: EvmCdArray::try_from_array(params.addresses.swap_path, SWAP_PATH_LEN)
+                .expect("the swap path fills its fixed-size array"),
         },
         numbers: derived_order_numbers(params.numbers),
         order_type,
@@ -216,7 +221,8 @@ fn derived_create_order_params_slice<'a, const SWAP_PATH_LEN: usize, OrderType>(
         should_unwrap_native_token: params.should_unwrap_native_token,
         auto_cancel: params.auto_cancel,
         referral_code: [0; 32],
-        data_list: &[],
+        data_list: EvmCdArray::try_from_array([], 0)
+            .expect("the empty data list fits its zero-length array"),
     }
 }
 
@@ -246,7 +252,7 @@ fn derived_create_order_params_vec<OrderType>(
     }
 }
 
-fn encode_slice_call<const ALL: usize>(
+fn encode_array_call<const ALL: usize>(
     call: &impl EvmCdSerialise,
     expected_len: usize,
 ) -> [u8; ALL] {
@@ -269,23 +275,27 @@ fn encode_dynamic_call(call: &impl EvmCdSerialise) -> Vec<u8> {
 }
 
 /// Encode a GMX V2 increase order without allocation.
-pub fn make_fn_create_increase_order_slice<const SWAP_PATH_LEN: usize, const ALL: usize>(
-    params: OrderParams<'_, SWAP_PATH_LEN>,
+pub fn make_fn_create_increase_order_array<const SWAP_PATH_LEN: usize, const ALL: usize>(
+    params: OrderParams<SWAP_PATH_LEN>,
     order_type: IncreaseOrderType,
 ) -> [u8; ALL] {
-    encode_slice_call(
-        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_slice(params, order_type)),
+    encode_array_call(
+        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(
+            params, order_type,
+        )),
         create_order_calldata_len(SWAP_PATH_LEN),
     )
 }
 
 /// Encode a GMX V2 decrease order without allocation.
-pub fn make_fn_create_decrease_order_slice<const SWAP_PATH_LEN: usize, const ALL: usize>(
-    params: OrderParams<'_, SWAP_PATH_LEN>,
+pub fn make_fn_create_decrease_order_array<const SWAP_PATH_LEN: usize, const ALL: usize>(
+    params: OrderParams<SWAP_PATH_LEN>,
     order_type: DecreaseOrderType,
 ) -> [u8; ALL] {
-    encode_slice_call(
-        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_slice(params, order_type)),
+    encode_array_call(
+        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(
+            params, order_type,
+        )),
         create_order_calldata_len(SWAP_PATH_LEN),
     )
 }
@@ -320,19 +330,29 @@ pub fn make_fn_cancel_order(key: [u8; 32]) -> [u8; 36] {
 }
 
 /// Encode a claim for positive funding fees without allocation.
-pub fn make_fn_claim_funding_fees_slice<
+pub fn make_fn_claim_funding_fees_array<
     const MARKETS_LEN: usize,
     const TOKENS_LEN: usize,
     const ALL: usize,
 >(
-    markets: &[EvmCdAddress; MARKETS_LEN],
-    tokens: &[EvmCdAddress; TOKENS_LEN],
+    markets: [EvmCdAddress; MARKETS_LEN],
+    tokens: [EvmCdAddress; TOKENS_LEN],
     receiver: Address,
 ) -> [u8; ALL] {
-    encode_slice_call(
+    let markets = EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(
+        markets,
+        MARKETS_LEN,
+    )
+    .expect("the markets fill their fixed-size array");
+    let tokens = EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(
+        tokens,
+        TOKENS_LEN,
+    )
+    .expect("the tokens fill their fixed-size array");
+    encode_array_call(
         &DerivedClaimFundingFeesCall::ClaimFundingFees(
-            markets.as_slice(),
-            tokens.as_slice(),
+            markets,
+            tokens,
             EvmCdAddress::new(receiver),
         ),
         claim_funding_fees_calldata_len(MARKETS_LEN, TOKENS_LEN),
@@ -354,22 +374,37 @@ pub fn make_fn_claim_funding_fees_vec(
 }
 
 /// Encode a claim for collateral retained after capped negative price impact without allocation.
-pub fn make_fn_claim_collateral_slice<
+pub fn make_fn_claim_collateral_array<
     const MARKETS_LEN: usize,
     const TOKENS_LEN: usize,
     const TIME_KEYS_LEN: usize,
     const ALL: usize,
 >(
-    markets: &[EvmCdAddress; MARKETS_LEN],
-    tokens: &[EvmCdAddress; TOKENS_LEN],
-    time_keys: &[U; TIME_KEYS_LEN],
+    markets: [EvmCdAddress; MARKETS_LEN],
+    tokens: [EvmCdAddress; TOKENS_LEN],
+    time_keys: [U; TIME_KEYS_LEN],
     receiver: Address,
 ) -> [u8; ALL] {
-    encode_slice_call(
+    let markets = EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(
+        markets,
+        MARKETS_LEN,
+    )
+    .expect("the markets fill their fixed-size array");
+    let tokens = EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(
+        tokens,
+        TOKENS_LEN,
+    )
+    .expect("the tokens fill their fixed-size array");
+    let time_keys = EvmCdArray::<U, TIME_KEYS_LEN, TIME_KEYS_LEN>::try_from_array(
+        time_keys,
+        TIME_KEYS_LEN,
+    )
+    .expect("the time keys fill their fixed-size array");
+    encode_array_call(
         &DerivedClaimCollateralCall::ClaimCollateral(
-            markets.as_slice(),
-            tokens.as_slice(),
-            time_keys.as_slice(),
+            markets,
+            tokens,
+            time_keys,
             EvmCdAddress::new(receiver),
         ),
         claim_collateral_calldata_len(MARKETS_LEN, TOKENS_LEN, TIME_KEYS_LEN),
@@ -635,7 +670,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod slice_tests {
+mod array_tests {
     extern crate std;
 
     use super::*;
@@ -704,7 +739,7 @@ mod slice_tests {
 
     proptest! {
         #[test]
-        fn create_order_slice_matches_alloy(
+        fn create_increase_order_array_matches_alloy(
             addresses in any::<[[u8; 20]; 6]>(),
             swap_path in any::<[[u8; 20]; 3]>(),
             numbers in any::<[U; 8]>(),
@@ -723,7 +758,7 @@ mod slice_tests {
                     ui_fee_receiver: addresses[3],
                     market: addresses[4],
                     initial_collateral_token: addresses[5],
-                    swap_path: &bobcat_swap_path,
+                    swap_path: bobcat_swap_path,
                 },
                 numbers: OrderNumbers {
                     size_delta_usd: numbers[0],
@@ -771,15 +806,16 @@ mod slice_tests {
                 },
             }
             .abi_encode();
-            let actual = make_fn_create_increase_order_slice::<SWAP_PATH_LEN, ALL>(
+            let actual = make_fn_create_increase_order_array::<SWAP_PATH_LEN, ALL>(
                 params,
                 IncreaseOrderType::Market,
             );
-            prop_assert_eq!(actual.as_slice(), expected);
+            let expected: [u8; ALL] = expected.try_into().expect("Alloy encoded the expected length");
+            prop_assert_eq!(actual, expected);
         }
 
         #[test]
-        fn create_decrease_order_slice_matches_alloy(
+        fn create_decrease_order_array_matches_alloy(
             addresses in any::<[[u8; 20]; 6]>(),
             swap_path in any::<[[u8; 20]; 3]>(),
             numbers in any::<[U; 8]>(),
@@ -798,7 +834,7 @@ mod slice_tests {
                     ui_fee_receiver: addresses[3],
                     market: addresses[4],
                     initial_collateral_token: addresses[5],
-                    swap_path: &bobcat_swap_path,
+                    swap_path: bobcat_swap_path,
                 },
                 numbers: OrderNumbers {
                     size_delta_usd: numbers[0],
@@ -846,15 +882,16 @@ mod slice_tests {
                 },
             }
             .abi_encode();
-            let actual = make_fn_create_decrease_order_slice::<SWAP_PATH_LEN, ALL>(
+            let actual = make_fn_create_decrease_order_array::<SWAP_PATH_LEN, ALL>(
                 params,
                 DecreaseOrderType::StopLoss,
             );
-            prop_assert_eq!(actual.as_slice(), expected);
+            let expected: [u8; ALL] = expected.try_into().expect("Alloy encoded the expected length");
+            prop_assert_eq!(actual, expected);
         }
 
         #[test]
-        fn claim_funding_fees_slice_matches_alloy(
+        fn claim_funding_fees_array_matches_alloy(
             markets in any::<[[u8; 20]; 2]>(),
             tokens in any::<[[u8; 20]; 3]>(),
             receiver in any::<[u8; 20]>(),
@@ -868,16 +905,17 @@ mod slice_tests {
                 receiver: AlloyAddress::from(receiver),
             }
             .abi_encode();
-            let actual = make_fn_claim_funding_fees_slice::<2, 3, ALL>(
-                &bobcat_markets,
-                &bobcat_tokens,
+            let actual = make_fn_claim_funding_fees_array::<2, 3, ALL>(
+                bobcat_markets,
+                bobcat_tokens,
                 receiver,
             );
-            prop_assert_eq!(actual.as_slice(), expected);
+            let expected: [u8; ALL] = expected.try_into().expect("Alloy encoded the expected length");
+            prop_assert_eq!(actual, expected);
         }
 
         #[test]
-        fn claim_collateral_slice_matches_alloy(
+        fn claim_collateral_array_matches_alloy(
             markets in any::<[[u8; 20]; 2]>(),
             tokens in any::<[[u8; 20]; 3]>(),
             time_keys in any::<[U; 4]>(),
@@ -893,13 +931,14 @@ mod slice_tests {
                 receiver: AlloyAddress::from(receiver),
             }
             .abi_encode();
-            let actual = make_fn_claim_collateral_slice::<2, 3, 4, ALL>(
-                &bobcat_markets,
-                &bobcat_tokens,
-                &time_keys,
+            let actual = make_fn_claim_collateral_array::<2, 3, 4, ALL>(
+                bobcat_markets,
+                bobcat_tokens,
+                time_keys,
                 receiver,
             );
-            prop_assert_eq!(actual.as_slice(), expected);
+            let expected: [u8; ALL] = expected.try_into().expect("Alloy encoded the expected length");
+            prop_assert_eq!(actual, expected);
         }
     }
 }
@@ -924,7 +963,8 @@ mod fixed_size_tests {
             }
             .abi_encode();
             let actual = make_fn_cancel_order(key);
-            prop_assert_eq!(actual.as_slice(), expected);
+            let expected: [u8; 36] = expected.try_into().expect("Alloy encoded the expected length");
+            prop_assert_eq!(actual, expected);
         }
     }
 }

@@ -8,7 +8,7 @@
 //! The quote builders target `IV4Quoter`'s single-pool exact-input and exact-output
 //! entrypoints. These quoter functions are intentionally non-view in Solidity.
 
-use bobcat_cd::{EvmCdAddress, EvmCdError, EvmCdSerialise, EvmCdWrite};
+use bobcat_cd::{EvmCdAddress, EvmCdArray, EvmCdError, EvmCdSerialise, EvmCdWrite};
 use bobcat_maths::U;
 
 pub type Address = [u8; 20];
@@ -99,8 +99,7 @@ struct DerivedCurrencyAmount {
 #[derive(EvmCdSerialise)]
 struct DerivedPlan<'a> {
     actions: DerivedBytes<'a>,
-    params:
-        DerivedBytesArrayThree<DerivedSwapParams<'a>, DerivedRawPayload<'a>, DerivedRawPayload<'a>>,
+    params: EvmCdArray<DerivedEncodedBytes<DerivedPlanPayload<'a>>, 3, 3>,
 }
 
 #[derive(EvmCdSerialise)]
@@ -246,55 +245,23 @@ impl EvmCdSerialise for DerivedRawPayload<'_> {
     }
 }
 
-struct DerivedBytesArrayThree<A, B, C>(
-    DerivedEncodedBytes<A>,
-    DerivedEncodedBytes<B>,
-    DerivedEncodedBytes<C>,
-);
+enum DerivedPlanPayload<'a> {
+    Swap(DerivedSwapParams<'a>),
+    Raw(DerivedRawPayload<'a>),
+}
 
-impl<A: EvmCdSerialise, B: EvmCdSerialise, C: EvmCdSerialise> EvmCdSerialise
-    for DerivedBytesArrayThree<A, B, C>
-{
+impl EvmCdSerialise for DerivedPlanPayload<'_> {
     fn serialise_writer<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
-        U::from_u32(32).serialise_value(writer)?;
-        self.serialise_abi_tail(writer)
-    }
-
-    fn is_abi_dynamic() -> bool {
-        true
-    }
-
-    fn abi_tail_size(&self) -> usize {
-        128usize
-            .saturating_add(self.0.abi_tail_size())
-            .saturating_add(self.1.abi_tail_size())
-            .saturating_add(self.2.abi_tail_size())
-    }
-
-    fn serialise_abi_head<W: EvmCdWrite>(
-        &self,
-        tail_offset: usize,
-        writer: &mut W,
-    ) -> Result<(), EvmCdError> {
-        U::from_usize(tail_offset).serialise_value(writer)
-    }
-
-    fn serialise_abi_tail<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
-        U::from_u8(3).serialise_value(writer)?;
-        let second = 96usize.saturating_add(self.0.abi_tail_size());
-        let third = second.saturating_add(self.1.abi_tail_size());
-        self.0.serialise_abi_head(96, writer)?;
-        self.1.serialise_abi_head(second, writer)?;
-        self.2.serialise_abi_head(third, writer)?;
-        self.0.serialise_abi_tail(writer)?;
-        self.1.serialise_abi_tail(writer)?;
-        self.2.serialise_abi_tail(writer)
+        match self {
+            Self::Swap(value) => value.serialise_writer(writer),
+            Self::Raw(value) => value.serialise_writer(writer),
+        }
     }
 
     fn append_abi_type(
         hasher: bobcat_cd::serialisation::SelectorHasher,
     ) -> bobcat_cd::serialisation::SelectorHasher {
-        hasher.update(b"bytes[]")
+        hasher
     }
 }
 
@@ -458,29 +425,33 @@ pub fn make_fn_execute_exact_input_single(
     .map_err(|_| EncodeError::SerialisationFailed)?;
     let plan = DerivedPlan {
         actions: DerivedBytes(&actions),
-        params: DerivedBytesArrayThree(
-            DerivedEncodedBytes {
-                value: DerivedSwapParams {
-                    params: DerivedExactInputSingleParams {
-                        pool_key: derived_pool_key(swap.pool_key),
-                        zero_for_one: swap.zero_for_one,
-                        amount_in: swap.amount_in,
-                        amount_out_minimum: swap.amount_out_minimum,
-                        min_hop_price_x36: swap.min_hop_price_x36,
-                        hook_data: DerivedBytes(swap.hook_data),
-                    },
+        params: EvmCdArray::try_from_array(
+            [
+                DerivedEncodedBytes {
+                    value: DerivedPlanPayload::Swap(DerivedSwapParams {
+                        params: DerivedExactInputSingleParams {
+                            pool_key: derived_pool_key(swap.pool_key),
+                            zero_for_one: swap.zero_for_one,
+                            amount_in: swap.amount_in,
+                            amount_out_minimum: swap.amount_out_minimum,
+                            min_hop_price_x36: swap.min_hop_price_x36,
+                            hook_data: DerivedBytes(swap.hook_data),
+                        },
+                    }),
+                    encoded_len: swap_param_len,
                 },
-                encoded_len: swap_param_len,
-            },
-            DerivedEncodedBytes {
-                value: DerivedRawPayload(&settle),
-                encoded_len: settle.len(),
-            },
-            DerivedEncodedBytes {
-                value: DerivedRawPayload(&take),
-                encoded_len: take.len(),
-            },
-        ),
+                DerivedEncodedBytes {
+                    value: DerivedPlanPayload::Raw(DerivedRawPayload(&settle)),
+                    encoded_len: settle.len(),
+                },
+                DerivedEncodedBytes {
+                    value: DerivedPlanPayload::Raw(DerivedRawPayload(&take)),
+                    encoded_len: take.len(),
+                },
+            ],
+            3,
+        )
+        .map_err(|_| EncodeError::SerialisationFailed)?,
     };
     let inputs = [DerivedEncodedBytes {
         value: plan,
