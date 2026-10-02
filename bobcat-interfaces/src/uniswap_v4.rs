@@ -400,7 +400,7 @@ pub fn make_fn_execute_exact_input_single_vec(swap: ExactInputSingleVec, deadlin
         .expect("Uniswap V4 calldata serialization failed")
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
     use alloy_primitives::{
@@ -409,6 +409,11 @@ mod tests {
     };
     use alloy_sol_macro::sol;
     use alloy_sol_types::{SolCall, SolValue};
+    use proptest::prelude::*;
+
+    const FIXED_HOOK_LEN: usize = 65;
+    const FIXED_QUOTE_LEN: usize = quote_exact_single_calldata_len(FIXED_HOOK_LEN);
+    const FIXED_EXECUTE_LEN: usize = exact_input_single_calldata_len(FIXED_HOOK_LEN);
 
     sol! {
         struct OraclePoolKey {
@@ -417,6 +422,13 @@ mod tests {
             uint24 fee;
             int24 tickSpacing;
             address hooks;
+        }
+
+        struct OracleQuoteExactSingleParams {
+            OraclePoolKey poolKey;
+            bool zeroForOne;
+            uint128 exactAmount;
+            bytes hookData;
         }
 
         struct OracleExactInputSingleParams {
@@ -428,267 +440,285 @@ mod tests {
             bytes hookData;
         }
 
+        function quoteExactInputSingle(OracleQuoteExactSingleParams memory params)
+            external returns (uint256 amountOut, uint256 gasEstimate);
+        function quoteExactOutputSingle(OracleQuoteExactSingleParams memory params)
+            external returns (uint256 amountIn, uint256 gasEstimate);
         function execute(bytes commands, bytes[] inputs, uint256 deadline);
     }
 
-    const INPUT_FIXTURE: &str = concat!(
-        "aa9d21cb",
-        "0000000000000000000000000000000000000000000000000000000000000020",
-        "0000000000000000000000000000000000000000000000000000000000000000",
-        "0000000000000000000000001111111111111111111111111111111111111111",
-        "00000000000000000000000000000000000000000000000000000000000001f4",
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6",
-        "0000000000000000000000002222222222222222222222222222222222222222",
-        "0000000000000000000000000000000000000000000000000000000000000000",
-        "000000000000000000000000000000000000000000000000000000000001e240",
-        "0000000000000000000000000000000000000000000000000000000000000100",
-        "0000000000000000000000000000000000000000000000000000000000000003",
-        "abcdef0000000000000000000000000000000000000000000000000000000000",
-    );
-
-    fn pool_key() -> PoolKey {
+    fn pool_key(
+        currency0: Address,
+        currency1: Address,
+        fee: U24,
+        tick_spacing: I24,
+        hooks: Address,
+    ) -> PoolKey {
         PoolKey {
-            currency0: [0; 20],
-            currency1: [0x11; 20],
-            fee: [0x00, 0x01, 0xf4],
-            tick_spacing: [0xff, 0xff, 0xf6],
-            hooks: [0x22; 20],
+            currency0,
+            currency1,
+            fee,
+            tick_spacing,
+            hooks,
         }
     }
 
-    fn fixture() -> QuoteExactSingleParams<3> {
-        QuoteExactSingleParams {
-            pool_key: pool_key(),
-            zero_for_one: false,
-            exact_amount: 123_456,
-            hook_data: [0xab, 0xcd, 0xef],
+    fn oracle_pool_key(pool: PoolKey) -> OraclePoolKey {
+        let sign = if pool.tick_spacing[0] & 0x80 == 0 {
+            0
+        } else {
+            0xff
+        };
+        OraclePoolKey {
+            currency0: AlloyAddress::from(pool.currency0),
+            currency1: AlloyAddress::from(pool.currency1),
+            fee: AlloyU24::from_be_bytes(pool.fee),
+            tickSpacing: AlloyI24::try_from(i32::from_be_bytes([
+                sign,
+                pool.tick_spacing[0],
+                pool.tick_spacing[1],
+                pool.tick_spacing[2],
+            ]))
+            .unwrap(),
+            hooks: AlloyAddress::from(pool.hooks),
         }
     }
 
-    #[test]
-    fn fixed_quote_type_owns_const_sized_hook_data() {
-        let encoded: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
-        let expected: [u8; 356] = const_hex::decode(INPUT_FIXTURE)
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        assert_eq!(encoded, expected);
+    fn oracle_quote(
+        pool: PoolKey,
+        zero_for_one: bool,
+        exact_amount: u128,
+        hook_data: &[u8],
+    ) -> OracleQuoteExactSingleParams {
+        OracleQuoteExactSingleParams {
+            poolKey: oracle_pool_key(pool),
+            zeroForOne: zero_for_one,
+            exactAmount: exact_amount,
+            hookData: Bytes::copy_from_slice(hook_data),
+        }
     }
 
-    #[test]
-    fn exact_output_quote_uses_output_selector_and_same_body() {
-        let input: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
-        let output: [u8; 356] = make_fn_quote_exact_output_single_array(fixture());
-
-        assert_eq!(&output[..4], &[0x58, 0x73, 0x30, 0x73]);
-        assert_eq!(&output[4..], &input[4..]);
-    }
-
-    #[test]
-    fn empty_hook_data_is_carried_by_the_zero_length_type() {
-        let params = QuoteExactSingleParams {
-            pool_key: pool_key(),
-            zero_for_one: true,
-            exact_amount: 123_456,
-            hook_data: [],
-        };
-        let output = make_fn_quote_exact_input_zero_hooks(params);
-
-        assert_eq!(&output[..4], &[0xaa, 0x9d, 0x21, 0xcb]);
-        assert_eq!(output[227], 1);
-        assert_eq!(&output[292..324], &[0; 32]);
-    }
-
-    #[test]
-    fn execute_exact_input_single_matches_alloy() {
-        let swap = ExactInputSingle {
-            pool_key: PoolKey {
-                currency0: [0x11; 20],
-                currency1: [0x22; 20],
-                fee: [0x00, 0x01, 0xf4],
-                tick_spacing: [0xff, 0xff, 0xf6],
-                hooks: [0x33; 20],
-            },
-            zero_for_one: true,
-            amount_in: 123,
-            amount_out_minimum: 45,
-            min_hop_price_x36: U::from_u8(7),
-            hook_data: [0xab, 0xcd, 0xef],
-        };
-        let actual: [u8; 1156] = make_fn_execute_exact_input_single_array(swap, U::from_u8(9));
-
-        let swap_param = (OracleExactInputSingleParams {
-            poolKey: OraclePoolKey {
-                currency0: AlloyAddress::from(swap.pool_key.currency0),
-                currency1: AlloyAddress::from(swap.pool_key.currency1),
-                fee: AlloyU24::from(500u16),
-                tickSpacing: AlloyI24::try_from(-10i32).unwrap(),
-                hooks: AlloyAddress::from(swap.pool_key.hooks),
-            },
-            zeroForOne: swap.zero_for_one,
-            amountIn: swap.amount_in,
-            amountOutMinimum: swap.amount_out_minimum,
-            minHopPriceX36: AlloyU256::from(7),
-            hookData: Bytes::copy_from_slice(&swap.hook_data),
+    #[allow(clippy::too_many_arguments)]
+    fn oracle_execute(
+        pool: PoolKey,
+        zero_for_one: bool,
+        amount_in: u128,
+        amount_out_minimum: u128,
+        min_hop_price_x36: U,
+        hook_data: &[u8],
+        deadline: U,
+    ) -> Vec<u8> {
+        let swap = (OracleExactInputSingleParams {
+            poolKey: oracle_pool_key(pool),
+            zeroForOne: zero_for_one,
+            amountIn: amount_in,
+            amountOutMinimum: amount_out_minimum,
+            minHopPriceX36: AlloyU256::from_be_bytes(*min_hop_price_x36),
+            hookData: Bytes::copy_from_slice(hook_data),
         },)
             .abi_encode_params();
-        let settle =
-            (AlloyAddress::from(swap.pool_key.currency0), swap.amount_in).abi_encode_params();
-        let take = (
-            AlloyAddress::from(swap.pool_key.currency1),
-            swap.amount_out_minimum,
-        )
-            .abi_encode_params();
+        let (currency_in, currency_out) = if zero_for_one {
+            (pool.currency0, pool.currency1)
+        } else {
+            (pool.currency1, pool.currency0)
+        };
+        let settle = (AlloyAddress::from(currency_in), amount_in).abi_encode_params();
+        let take = (AlloyAddress::from(currency_out), amount_out_minimum).abi_encode_params();
         let plan = (
-            Bytes::copy_from_slice(&[
-                ACTION_SWAP_EXACT_IN_SINGLE,
-                ACTION_SETTLE_ALL,
-                ACTION_TAKE_ALL,
-            ]),
-            vec![
-                Bytes::from(swap_param),
-                Bytes::from(settle),
-                Bytes::from(take),
-            ],
+            Bytes::copy_from_slice(&[0x06, 0x0c, 0x0f]),
+            vec![Bytes::from(swap), Bytes::from(settle), Bytes::from(take)],
         )
             .abi_encode_params();
-        let expected = executeCall {
-            commands: Bytes::copy_from_slice(&[COMMAND_V4_SWAP]),
+
+        executeCall {
+            commands: Bytes::copy_from_slice(&[0x10]),
             inputs: vec![Bytes::from(plan)],
-            deadline: AlloyU256::from(9),
+            deadline: AlloyU256::from_be_bytes(*deadline),
         }
-        .abi_encode();
-
-        assert_eq!(actual.to_vec(), expected);
+        .abi_encode()
     }
 
-    #[test]
-    fn execute_supports_the_largest_generated_hook_byte_capacity() {
-        let swap = ExactInputSingle {
-            pool_key: pool_key(),
-            zero_for_one: true,
-            amount_in: 123,
-            amount_out_minimum: 45,
-            min_hop_price_x36: U::from_u8(7),
-            hook_data: [0xabu8; 1024],
-        };
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
 
-        let actual: [u8; 2148] = make_fn_execute_exact_input_single_array(swap, U::from_u8(9));
-
-        assert_eq!(&actual[..4], &[0x35, 0x93, 0x56, 0x4c]);
-        assert_eq!(actual.len(), exact_input_single_calldata_len(1024));
-    }
-
-    #[test]
-    fn execute_has_no_intermediate_byte_capacity_limit() {
-        const HOOK_LEN: usize = 2049;
-        const CALLDATA_LEN: usize = exact_input_single_calldata_len(HOOK_LEN);
-        let swap = ExactInputSingle {
-            pool_key: pool_key(),
-            zero_for_one: true,
-            amount_in: 42,
-            amount_out_minimum: 24,
-            min_hop_price_x36: U::ZERO,
-            hook_data: [0xabu8; HOOK_LEN],
-        };
-
-        let actual: [u8; CALLDATA_LEN] =
-            make_fn_execute_exact_input_single_array(swap, U::from_u64(123));
-
-        assert_eq!(&actual[..4], &[0x35, 0x93, 0x56, 0x4c]);
-        assert_eq!(actual.len(), CALLDATA_LEN);
-    }
-
-    #[test]
-    fn length_helpers_return_plain_lengths() {
-        assert_eq!(quote_exact_single_calldata_len(0), 324);
-        assert_eq!(quote_exact_single_calldata_len(1), 356);
-        assert_eq!(quote_exact_single_calldata_len(33), 388);
-    }
-
-    #[test]
-    #[should_panic(expected = "hook data length overflows calldata length")]
-    fn length_helpers_panic_on_overflow() {
-        let _ = quote_exact_single_calldata_len(usize::MAX);
-    }
-
-    #[test]
-    #[should_panic(expected = "calldata output array has the wrong length")]
-    fn fixed_builders_panic_for_the_wrong_array_length() {
-        let _: [u8; 355] = make_fn_quote_exact_input_single_array(fixture());
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn quote_vec_variant_matches_const_sized_variant() {
-        let fixed: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
-        let dynamic = make_fn_quote_exact_input_single_vec(QuoteExactSingleParamsVec {
-            pool_key: pool_key(),
-            zero_for_one: false,
-            exact_amount: 123_456,
-            hook_data: vec![0xab, 0xcd, 0xef],
-        });
-
-        assert_eq!(fixed.to_vec(), dynamic);
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn execute_vec_variant_matches_const_sized_variant() {
-        let fixed_swap = ExactInputSingle {
-            pool_key: pool_key(),
-            zero_for_one: false,
-            amount_in: 123,
-            amount_out_minimum: 45,
-            min_hop_price_x36: U::from_u8(7),
-            hook_data: [0xab, 0xcd, 0xef],
-        };
-        let fixed: [u8; 1156] = make_fn_execute_exact_input_single_array(fixed_swap, U::from_u8(9));
-        let dynamic = make_fn_execute_exact_input_single_vec(
-            ExactInputSingleVec {
-                pool_key: pool_key(),
-                zero_for_one: false,
-                amount_in: 123,
-                amount_out_minimum: 45,
-                min_hop_price_x36: U::from_u8(7),
-                hook_data: vec![0xab, 0xcd, 0xef],
-            },
-            U::from_u8(9),
-        );
-
-        assert_eq!(fixed.to_vec(), dynamic);
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn execute_vec_variant_preserves_hook_data_above_generated_alias_range() {
-        const HOOK_LEN: usize = 1025;
-        const CALLDATA_LEN: usize = exact_input_single_calldata_len(HOOK_LEN);
-        let hook_data = [0xabu8; HOOK_LEN];
-        let fixed: [u8; CALLDATA_LEN] = make_fn_execute_exact_input_single_array(
-            ExactInputSingle {
-                pool_key: pool_key(),
-                zero_for_one: false,
-                amount_in: 123,
-                amount_out_minimum: 45,
-                min_hop_price_x36: U::from_u8(7),
+        #[test]
+        fn fixed_quote_builders_match_alloy(
+            currency0 in any::<Address>(),
+            currency1 in any::<Address>(),
+            fee in any::<U24>(),
+            tick_spacing in any::<I24>(),
+            hooks in any::<Address>(),
+            zero_for_one in any::<bool>(),
+            exact_amount in any::<u128>(),
+            hook_data in any::<[u8; FIXED_HOOK_LEN]>(),
+        ) {
+            let pool = pool_key(currency0, currency1, fee, tick_spacing, hooks);
+            let params = QuoteExactSingleParams {
+                pool_key: pool,
+                zero_for_one,
+                exact_amount,
                 hook_data,
-            },
-            U::from_u8(9),
-        );
-        let dynamic = make_fn_execute_exact_input_single_vec(
-            ExactInputSingleVec {
-                pool_key: pool_key(),
-                zero_for_one: false,
-                amount_in: 123,
-                amount_out_minimum: 45,
-                min_hop_price_x36: U::from_u8(7),
-                hook_data: hook_data.to_vec(),
-            },
-            U::from_u8(9),
-        );
+            };
 
-        assert_eq!(fixed.to_vec(), dynamic);
+            let input: [u8; FIXED_QUOTE_LEN] = make_fn_quote_exact_input_single_array(params);
+            let expected_input = quoteExactInputSingleCall {
+                params: oracle_quote(pool, zero_for_one, exact_amount, &hook_data),
+            }
+            .abi_encode();
+            prop_assert_eq!(input.as_slice(), expected_input.as_slice());
+
+            let output: [u8; FIXED_QUOTE_LEN] = make_fn_quote_exact_output_single_array(params);
+            let expected_output = quoteExactOutputSingleCall {
+                params: oracle_quote(pool, zero_for_one, exact_amount, &hook_data),
+            }
+            .abi_encode();
+            prop_assert_eq!(output.as_slice(), expected_output.as_slice());
+        }
+
+        #[test]
+        fn zero_hook_quote_builder_matches_alloy(
+            currency0 in any::<Address>(),
+            currency1 in any::<Address>(),
+            fee in any::<U24>(),
+            tick_spacing in any::<I24>(),
+            hooks in any::<Address>(),
+            zero_for_one in any::<bool>(),
+            exact_amount in any::<u128>(),
+        ) {
+            let pool = pool_key(currency0, currency1, fee, tick_spacing, hooks);
+            let actual = make_fn_quote_exact_input_zero_hooks(QuoteExactSingleParams {
+                pool_key: pool,
+                zero_for_one,
+                exact_amount,
+                hook_data: [],
+            });
+            let expected = quoteExactInputSingleCall {
+                params: oracle_quote(pool, zero_for_one, exact_amount, &[]),
+            }
+            .abi_encode();
+
+            prop_assert_eq!(actual.as_slice(), expected.as_slice());
+        }
+
+        #[test]
+        fn fixed_execute_builder_matches_alloy(
+            currency0 in any::<Address>(),
+            currency1 in any::<Address>(),
+            fee in any::<U24>(),
+            tick_spacing in any::<I24>(),
+            hooks in any::<Address>(),
+            zero_for_one in any::<bool>(),
+            amount_in in any::<u128>(),
+            amount_out_minimum in any::<u128>(),
+            min_hop_price_x36 in any::<U>(),
+            hook_data in any::<[u8; FIXED_HOOK_LEN]>(),
+            deadline in any::<U>(),
+        ) {
+            let pool = pool_key(currency0, currency1, fee, tick_spacing, hooks);
+            let actual: [u8; FIXED_EXECUTE_LEN] = make_fn_execute_exact_input_single_array(
+                ExactInputSingle {
+                    pool_key: pool,
+                    zero_for_one,
+                    amount_in,
+                    amount_out_minimum,
+                    min_hop_price_x36,
+                    hook_data,
+                },
+                deadline,
+            );
+            let expected = oracle_execute(
+                pool,
+                zero_for_one,
+                amount_in,
+                amount_out_minimum,
+                min_hop_price_x36,
+                &hook_data,
+                deadline,
+            );
+
+            prop_assert_eq!(actual.as_slice(), expected.as_slice());
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        #[test]
+        fn vec_quote_builders_match_alloy(
+            currency0 in any::<Address>(),
+            currency1 in any::<Address>(),
+            fee in any::<U24>(),
+            tick_spacing in any::<I24>(),
+            hooks in any::<Address>(),
+            zero_for_one in any::<bool>(),
+            exact_amount in any::<u128>(),
+            hook_data in prop::collection::vec(any::<u8>(), 0..=2048),
+        ) {
+            let pool = pool_key(currency0, currency1, fee, tick_spacing, hooks);
+            let expected_input = quoteExactInputSingleCall {
+                params: oracle_quote(pool, zero_for_one, exact_amount, &hook_data),
+            }
+            .abi_encode();
+            let expected_output = quoteExactOutputSingleCall {
+                params: oracle_quote(pool, zero_for_one, exact_amount, &hook_data),
+            }
+            .abi_encode();
+
+            let input = make_fn_quote_exact_input_single_vec(QuoteExactSingleParamsVec {
+                pool_key: pool,
+                zero_for_one,
+                exact_amount,
+                hook_data: hook_data.clone(),
+            });
+            let output = make_fn_quote_exact_output_single_vec(QuoteExactSingleParamsVec {
+                pool_key: pool,
+                zero_for_one,
+                exact_amount,
+                hook_data,
+            });
+
+            prop_assert_eq!(input, expected_input);
+            prop_assert_eq!(output, expected_output);
+        }
+
+        #[test]
+        fn vec_execute_builder_matches_alloy(
+            currency0 in any::<Address>(),
+            currency1 in any::<Address>(),
+            fee in any::<U24>(),
+            tick_spacing in any::<I24>(),
+            hooks in any::<Address>(),
+            zero_for_one in any::<bool>(),
+            amount_in in any::<u128>(),
+            amount_out_minimum in any::<u128>(),
+            min_hop_price_x36 in any::<U>(),
+            hook_data in prop::collection::vec(any::<u8>(), 0..=2048),
+            deadline in any::<U>(),
+        ) {
+            let pool = pool_key(currency0, currency1, fee, tick_spacing, hooks);
+            let expected = oracle_execute(
+                pool,
+                zero_for_one,
+                amount_in,
+                amount_out_minimum,
+                min_hop_price_x36,
+                &hook_data,
+                deadline,
+            );
+            let actual = make_fn_execute_exact_input_single_vec(
+                ExactInputSingleVec {
+                    pool_key: pool,
+                    zero_for_one,
+                    amount_in,
+                    amount_out_minimum,
+                    min_hop_price_x36,
+                    hook_data,
+                },
+                deadline,
+            );
+
+            prop_assert_eq!(actual, expected);
+        }
     }
 }

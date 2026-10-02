@@ -49,7 +49,7 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
             let sig = key.sign_prehashed(d, None).unwrap();
             let x: [u8; 32 * 5] =
                 concat_arrays!(hash, *key.verifying_key().as_bytes(), sig.to_bytes());
-            write_result_slice(&x);
+            write_slice(&x);
             0
         }
         SEL_EDVERIFY => {
