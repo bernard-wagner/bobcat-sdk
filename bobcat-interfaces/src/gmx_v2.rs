@@ -280,9 +280,7 @@ pub fn make_fn_create_increase_order_array<const SWAP_PATH_LEN: usize, const ALL
     order_type: IncreaseOrderType,
 ) -> [u8; ALL] {
     encode_array_call(
-        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(
-            params, order_type,
-        )),
+        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(params, order_type)),
         create_order_calldata_len(SWAP_PATH_LEN),
     )
 }
@@ -293,9 +291,7 @@ pub fn make_fn_create_decrease_order_array<const SWAP_PATH_LEN: usize, const ALL
     order_type: DecreaseOrderType,
 ) -> [u8; ALL] {
     encode_array_call(
-        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(
-            params, order_type,
-        )),
+        &DerivedCreateOrderCall::CreateOrder(derived_create_order_params_array(params, order_type)),
         create_order_calldata_len(SWAP_PATH_LEN),
     )
 }
@@ -339,16 +335,12 @@ pub fn make_fn_claim_funding_fees_array<
     tokens: [EvmCdAddress; TOKENS_LEN],
     receiver: Address,
 ) -> [u8; ALL] {
-    let markets = EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(
-        markets,
-        MARKETS_LEN,
-    )
-    .expect("the markets fill their fixed-size array");
-    let tokens = EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(
-        tokens,
-        TOKENS_LEN,
-    )
-    .expect("the tokens fill their fixed-size array");
+    let markets =
+        EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(markets, MARKETS_LEN)
+            .expect("the markets fill their fixed-size array");
+    let tokens =
+        EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(tokens, TOKENS_LEN)
+            .expect("the tokens fill their fixed-size array");
     encode_array_call(
         &DerivedClaimFundingFeesCall::ClaimFundingFees(
             markets,
@@ -385,21 +377,15 @@ pub fn make_fn_claim_collateral_array<
     time_keys: [U; TIME_KEYS_LEN],
     receiver: Address,
 ) -> [u8; ALL] {
-    let markets = EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(
-        markets,
-        MARKETS_LEN,
-    )
-    .expect("the markets fill their fixed-size array");
-    let tokens = EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(
-        tokens,
-        TOKENS_LEN,
-    )
-    .expect("the tokens fill their fixed-size array");
-    let time_keys = EvmCdArray::<U, TIME_KEYS_LEN, TIME_KEYS_LEN>::try_from_array(
-        time_keys,
-        TIME_KEYS_LEN,
-    )
-    .expect("the time keys fill their fixed-size array");
+    let markets =
+        EvmCdArray::<EvmCdAddress, MARKETS_LEN, MARKETS_LEN>::try_from_array(markets, MARKETS_LEN)
+            .expect("the markets fill their fixed-size array");
+    let tokens =
+        EvmCdArray::<EvmCdAddress, TOKENS_LEN, TOKENS_LEN>::try_from_array(tokens, TOKENS_LEN)
+            .expect("the tokens fill their fixed-size array");
+    let time_keys =
+        EvmCdArray::<U, TIME_KEYS_LEN, TIME_KEYS_LEN>::try_from_array(time_keys, TIME_KEYS_LEN)
+            .expect("the time keys fill their fixed-size array");
     encode_array_call(
         &DerivedClaimCollateralCall::ClaimCollateral(
             markets,

@@ -823,9 +823,18 @@ mod tests {
                 &input,
             );
 
-            prop_assert_eq!(actual_pt.as_slice(), expected_pt.as_slice());
-            prop_assert_eq!(actual_yt.as_slice(), expected_yt.as_slice());
-            prop_assert_eq!(actual_lp.as_slice(), expected_lp.as_slice());
+            let expected_pt: [u8; TOKEN_IN_CALLDATA_LEN] = expected_pt
+                .try_into()
+                .expect("Alloy encoded the expected token-input length");
+            let expected_yt: [u8; TOKEN_IN_CALLDATA_LEN] = expected_yt
+                .try_into()
+                .expect("Alloy encoded the expected token-input length");
+            let expected_lp: [u8; TOKEN_IN_CALLDATA_LEN] = expected_lp
+                .try_into()
+                .expect("Alloy encoded the expected token-input length");
+            prop_assert_eq!(actual_pt, expected_pt);
+            prop_assert_eq!(actual_yt, expected_yt);
+            prop_assert_eq!(actual_lp, expected_lp);
         }
 
         #[test]
@@ -873,9 +882,18 @@ mod tests {
             let actual_lp =
                 make_fn_remove_liquidity_single_token(receiver, market, &exact_in, &output);
 
-            prop_assert_eq!(actual_pt.as_slice(), expected_pt.as_slice());
-            prop_assert_eq!(actual_yt.as_slice(), expected_yt.as_slice());
-            prop_assert_eq!(actual_lp.as_slice(), expected_lp.as_slice());
+            let expected_pt: [u8; TOKEN_OUT_CALLDATA_LEN] = expected_pt
+                .try_into()
+                .expect("Alloy encoded the expected token-output length");
+            let expected_yt: [u8; TOKEN_OUT_CALLDATA_LEN] = expected_yt
+                .try_into()
+                .expect("Alloy encoded the expected token-output length");
+            let expected_lp: [u8; TOKEN_OUT_CALLDATA_LEN] = expected_lp
+                .try_into()
+                .expect("Alloy encoded the expected token-output length");
+            prop_assert_eq!(actual_pt, expected_pt);
+            prop_assert_eq!(actual_yt, expected_yt);
+            prop_assert_eq!(actual_lp, expected_lp);
         }
     }
 }
