@@ -26,6 +26,26 @@ fn serialises_directly_into_a_mut_vec() {
 }
 
 #[test]
+fn serialises_to_an_exact_array() {
+    let encoded = 0x1234u16.serialise_to_array::<32>().unwrap();
+
+    assert!(encoded[..30].iter().all(|byte| *byte == 0));
+    assert_eq!(&encoded[30..], &[0x12, 0x34]);
+    assert!(0x1234u16.serialise_to_array::<31>().is_err());
+    assert!(0x1234u16.serialise_to_array::<33>().is_err());
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn serialises_to_a_new_vec() {
+    let encoded = 0x1234u16.serialise_to_vec().unwrap();
+
+    assert_eq!(encoded.len(), 32);
+    assert!(encoded[..30].iter().all(|byte| *byte == 0));
+    assert_eq!(&encoded[30..], &[0x12, 0x34]);
+}
+
+#[test]
 fn selector_hasher_supports_signatures_larger_than_512_bytes() {
     let signature = [b'a'; 600];
     let selector = SelectorHasher::new().update(&signature).selector();

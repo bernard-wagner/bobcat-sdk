@@ -9,6 +9,20 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, Generics, Type, parse_macro_input};
 
+#[proc_macro]
+pub fn evm_cd_bytes_types(input: TokenStream) -> TokenStream {
+    if !input.is_empty() {
+        return syn::Error::new(proc_macro2::Span::call_site(), "expected no arguments")
+            .into_compile_error()
+            .into();
+    }
+    let aliases = (0usize..=1024).map(|capacity| {
+        let name = format_ident!("EvmCdBytes{capacity}");
+        quote!(pub type #name = EvmCdBytes<#capacity>;)
+    });
+    quote!(#(#aliases)*).into()
+}
+
 #[proc_macro_derive(EvmCdSerialise, attributes(evm_values, evm_selector))]
 pub fn derive_evm_cd_serialise(input: TokenStream) -> TokenStream {
     expand(
@@ -625,6 +639,12 @@ fn evm_cd_integer_abi(name: &str) -> Option<(&'static str, usize)> {
         .then_some((prefix, bits))
 }
 
+fn evm_cd_bytes_capacity(name: &str) -> Option<usize> {
+    let width = name.strip_prefix("EvmCdBytes")?;
+    let capacity: usize = width.parse().ok()?;
+    (capacity <= 1024 && width == capacity.to_string()).then_some(capacity)
+}
+
 fn static_abi_value_size(ty: &Type) -> Option<usize> {
     match ty {
         Type::Path(path) if path.qself.is_none() => {
@@ -763,6 +783,11 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
     {
         return Some(format!("{prefix}{bits}").into_bytes());
     }
+    if matches!(segment.arguments, syn::PathArguments::None)
+        && evm_cd_bytes_capacity(&name).is_some()
+    {
+        return Some(b"bytes".to_vec());
+    }
     match name.as_str() {
         "U" => Some(b"uint256".to_vec()),
         "bool" => Some(b"bool".to_vec()),
@@ -774,6 +799,7 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
         "usize" => Some(b"uint32".to_vec()),
         "EvmCdAddress" | "Address" => Some(b"address".to_vec()),
         "EvmCdString" => Some(b"string".to_vec()),
+        "EvmCdBytes" => Some(b"bytes".to_vec()),
         "Vec" => {
             let elem = first_type_arg()?;
             if is_u8_ty(elem) {
@@ -1313,6 +1339,11 @@ mod tests {
         assert_eq!(abi("[u8; 4]"), "bytes4");
         assert_eq!(abi("[u8; 20]"), "bytes20");
         assert_eq!(abi("Vec<u8>"), "bytes");
+        assert_eq!(abi("EvmCdBytes<64>"), "bytes");
+        assert_eq!(abi("EvmCdBytes0"), "bytes");
+        assert_eq!(abi("bobcat_cd::EvmCdBytes64"), "bytes");
+        assert_eq!(abi("EvmCdBytes1024"), "bytes");
+        assert_eq!(abi("EvmCdArray<EvmCdBytes1024, 0, 3>"), "bytes[]");
         assert_eq!(abi("Vec<U>"), "uint256[]");
         assert_eq!(abi("Vec<EvmCdAddress>"), "address[]");
         assert_eq!(abi("&[EvmCdAddress]"), "address[]");

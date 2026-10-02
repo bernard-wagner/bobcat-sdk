@@ -3,17 +3,19 @@
 pub mod serialisation;
 
 pub use serialisation::{
-    Error as EvmCdError, EvmCdAddress, EvmCdArray, EvmCdArrayError, EvmCdDeserialise, EvmCdI8,
-    EvmCdI16, EvmCdI24, EvmCdI32, EvmCdI40, EvmCdI48, EvmCdI56, EvmCdI64, EvmCdI72, EvmCdI80,
-    EvmCdI88, EvmCdI96, EvmCdI104, EvmCdI112, EvmCdI120, EvmCdI128, EvmCdI136, EvmCdI144,
-    EvmCdI152, EvmCdI160, EvmCdI168, EvmCdI176, EvmCdI184, EvmCdI192, EvmCdI200, EvmCdI208,
-    EvmCdI216, EvmCdI224, EvmCdI232, EvmCdI240, EvmCdI248, EvmCdI256, EvmCdSerialise, EvmCdString,
-    EvmCdStringError, EvmCdU8, EvmCdU16, EvmCdU24, EvmCdU32, EvmCdU40, EvmCdU48, EvmCdU56,
-    EvmCdU64, EvmCdU72, EvmCdU80, EvmCdU88, EvmCdU96, EvmCdU104, EvmCdU112, EvmCdU120, EvmCdU128,
-    EvmCdU136, EvmCdU144, EvmCdU152, EvmCdU160, EvmCdU168, EvmCdU176, EvmCdU184, EvmCdU192,
-    EvmCdU200, EvmCdU208, EvmCdU216, EvmCdU224, EvmCdU232, EvmCdU240, EvmCdU248, EvmCdU256,
-    EvmCdWriteTarget, Read as EvmCdRead, Write as EvmCdWrite,
+    Error as EvmCdError, EvmCdAddress, EvmCdArray, EvmCdArrayError, EvmCdBytes, EvmCdBytesError,
+    EvmCdDeserialise, EvmCdI8, EvmCdI16, EvmCdI24, EvmCdI32, EvmCdI40, EvmCdI48, EvmCdI56,
+    EvmCdI64, EvmCdI72, EvmCdI80, EvmCdI88, EvmCdI96, EvmCdI104, EvmCdI112, EvmCdI120, EvmCdI128,
+    EvmCdI136, EvmCdI144, EvmCdI152, EvmCdI160, EvmCdI168, EvmCdI176, EvmCdI184, EvmCdI192,
+    EvmCdI200, EvmCdI208, EvmCdI216, EvmCdI224, EvmCdI232, EvmCdI240, EvmCdI248, EvmCdI256,
+    EvmCdSerialise, EvmCdString, EvmCdStringError, EvmCdU8, EvmCdU16, EvmCdU24, EvmCdU32, EvmCdU40,
+    EvmCdU48, EvmCdU56, EvmCdU64, EvmCdU72, EvmCdU80, EvmCdU88, EvmCdU96, EvmCdU104, EvmCdU112,
+    EvmCdU120, EvmCdU128, EvmCdU136, EvmCdU144, EvmCdU152, EvmCdU160, EvmCdU168, EvmCdU176,
+    EvmCdU184, EvmCdU192, EvmCdU200, EvmCdU208, EvmCdU216, EvmCdU224, EvmCdU232, EvmCdU240,
+    EvmCdU248, EvmCdU256, EvmCdWriteTarget, Read as EvmCdRead, Write as EvmCdWrite,
 };
+
+bobcat_cd_derive::evm_cd_bytes_types!();
 
 #[cfg(feature = "derive")]
 pub use bobcat_cd_derive::{EvmCdDeserialise, EvmCdSerialise};

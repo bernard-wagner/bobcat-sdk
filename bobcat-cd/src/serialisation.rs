@@ -223,6 +223,23 @@ pub trait EvmCdSerialise {
         self.serialise_writer(&mut writer.writer())
     }
 
+    fn serialise_to_array<const N: usize>(&self) -> Result<[u8; N], Error> {
+        let mut output = [0; N];
+        let mut writer = output.as_mut_slice();
+        self.serialise_writer(&mut writer)?;
+        if !writer.is_empty() {
+            return Err(invalid_data());
+        }
+        Ok(output)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn serialise_to_vec(&self) -> Result<Vec<u8>, Error> {
+        let mut output = Vec::new();
+        self.serialise(&mut output)?;
+        Ok(output)
+    }
+
     #[doc(hidden)]
     fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error>;
 
@@ -1294,6 +1311,258 @@ where
             }
         }
         Ok(out)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvmCdBytesError {
+    TooLong,
+}
+
+#[derive(Clone)]
+pub struct EvmCdBytes<const CAP: usize> {
+    len: usize,
+    bytes: [u8; CAP],
+}
+
+impl<const CAP: usize> EvmCdBytes<CAP> {
+    pub const fn new() -> Self {
+        Self {
+            len: 0,
+            bytes: [0; CAP],
+        }
+    }
+
+    pub fn try_from_slice(value: &[u8]) -> Result<Self, EvmCdBytesError> {
+        if value.len() > CAP {
+            return Err(EvmCdBytesError::TooLong);
+        }
+        let mut bytes = [0; CAP];
+        bytes[..value.len()].copy_from_slice(value);
+        Ok(Self {
+            len: value.len(),
+            bytes,
+        })
+    }
+
+    pub fn try_from_serialised<T: EvmCdSerialise + ?Sized>(value: &T) -> Result<Self, Error> {
+        let mut bytes = Self::new();
+        value.serialise(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub const fn capacity(&self) -> usize {
+        CAP
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+
+    pub fn extend_from_slice(&mut self, value: &[u8]) -> Result<(), EvmCdBytesError> {
+        let end = self
+            .len
+            .checked_add(value.len())
+            .filter(|end| *end <= CAP)
+            .ok_or(EvmCdBytesError::TooLong)?;
+        self.bytes[self.len..end].copy_from_slice(value);
+        self.len = end;
+        Ok(())
+    }
+}
+
+impl<const CAP: usize> Default for EvmCdBytes<CAP> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const CAP: usize> From<[u8; CAP]> for EvmCdBytes<CAP> {
+    fn from(bytes: [u8; CAP]) -> Self {
+        Self { len: CAP, bytes }
+    }
+}
+
+impl<const CAP: usize> TryFrom<&[u8]> for EvmCdBytes<CAP> {
+    type Error = EvmCdBytesError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Self::try_from_slice(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<const CAP: usize> TryFrom<Vec<u8>> for EvmCdBytes<CAP> {
+    type Error = EvmCdBytesError;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from_slice(&value)
+    }
+}
+
+impl<const CAP: usize> AsRef<[u8]> for EvmCdBytes<CAP> {
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl<const CAP: usize> core::fmt::Debug for EvmCdBytes<CAP> {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self.as_slice(), formatter)
+    }
+}
+
+impl<const CAP: usize> PartialEq for EvmCdBytes<CAP> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl<const CAP: usize> Eq for EvmCdBytes<CAP> {}
+
+impl<const CAP: usize> PartialOrd for EvmCdBytes<CAP> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<const CAP: usize> Ord for EvmCdBytes<CAP> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.as_slice().cmp(other.as_slice())
+    }
+}
+
+impl<const CAP: usize> core::hash::Hash for EvmCdBytes<CAP> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        core::hash::Hash::hash(self.as_slice(), state)
+    }
+}
+
+#[doc(hidden)]
+pub struct EvmCdBytesWriter<'a, const CAP: usize> {
+    bytes: &'a mut EvmCdBytes<CAP>,
+}
+
+#[cfg(not(feature = "std"))]
+impl<const CAP: usize> Write for EvmCdBytesWriter<'_, CAP> {
+    fn write(&mut self, value: &[u8]) -> Result<usize, Error> {
+        let written = core::cmp::min(CAP - self.bytes.len, value.len());
+        let end = self.bytes.len + written;
+        self.bytes.bytes[self.bytes.len..end].copy_from_slice(&value[..written]);
+        self.bytes.len = end;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.bytes.len == CAP
+    }
+}
+
+#[cfg(feature = "std")]
+impl<const CAP: usize> Write for EvmCdBytesWriter<'_, CAP> {
+    fn write(&mut self, value: &[u8]) -> Result<usize, Error> {
+        let written = core::cmp::min(CAP - self.bytes.len, value.len());
+        let end = self.bytes.len + written;
+        self.bytes.bytes[self.bytes.len..end].copy_from_slice(&value[..written]);
+        self.bytes.len = end;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<const CAP: usize> EvmCdWriteTarget for EvmCdBytes<CAP> {
+    type Writer<'a> = EvmCdBytesWriter<'a, CAP>;
+
+    fn writer(&mut self) -> Self::Writer<'_> {
+        EvmCdBytesWriter { bytes: self }
+    }
+}
+
+impl<const CAP: usize> EvmCdSerialise for EvmCdBytes<CAP> {
+    fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        write_dynamic_bytes(self.as_slice(), writer)
+    }
+
+    fn is_abi_dynamic() -> bool {
+        true
+    }
+
+    fn abi_tail_size(&self) -> usize {
+        dynamic_tail_size(self.len)
+    }
+
+    fn serialise_abi_head<W: Write>(
+        &self,
+        tail_offset: usize,
+        writer: &mut W,
+    ) -> Result<(), Error> {
+        U::from_usize(tail_offset).serialise_value(writer)
+    }
+
+    fn serialise_abi_tail<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        write_dynamic_tail(self.as_slice(), writer)
+    }
+
+    fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+        hasher.update(b"bytes")
+    }
+}
+
+impl<const CAP: usize> EvmCdDeserialise for EvmCdBytes<CAP> {
+    type Buffer = EvmCdBuffer<([u8; 64], [u8; CAP], [u8; 31])>;
+
+    fn deserialise_reader<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        let (bytes, len) = read_dynamic_bytes::<CAP, _>(reader)?;
+        Ok(Self { len, bytes })
+    }
+
+    fn is_abi_dynamic() -> bool {
+        true
+    }
+
+    fn abi_tail_size(&self) -> usize {
+        dynamic_tail_size(self.len)
+    }
+
+    fn deserialise_abi_head<R: Read>(reader: &mut R) -> Result<EvmCdHead<Self>, Error> {
+        Ok(EvmCdHead::Offset(read_usize_word(reader)?))
+    }
+
+    fn deserialise_abi_finish<R: Read>(
+        head: EvmCdHead<Self>,
+        expected_tail_offset: usize,
+        reader: &mut R,
+    ) -> Result<Self, Error> {
+        match head {
+            EvmCdHead::Offset(offset) if offset == expected_tail_offset => {
+                let (bytes, len) = read_dynamic_tail::<CAP, _>(reader)?;
+                Ok(Self { len, bytes })
+            }
+            _ => Err(invalid_data()),
+        }
+    }
+
+    fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+        hasher.update(b"bytes")
     }
 }
 
