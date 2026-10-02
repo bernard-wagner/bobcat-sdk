@@ -4,7 +4,7 @@
 # bobcat-sdk
 
 bobcat-sdk is an opinionated SDK for Arbitrum Stylus, intended for advanced users. It
-powers several dApps, including 9lives and Orderbookkit.
+powers several dApps, including 9lives, Superposition Accounts, Florin, and Orderbookkit.
 
 ## Codesize savings
 

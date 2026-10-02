@@ -779,6 +779,81 @@ mod slice_tests {
         }
 
         #[test]
+        fn create_decrease_order_slice_matches_alloy(
+            addresses in any::<[[u8; 20]; 6]>(),
+            swap_path in any::<[[u8; 20]; 3]>(),
+            numbers in any::<[U; 8]>(),
+            is_long in any::<bool>(),
+            should_unwrap_native_token in any::<bool>(),
+            auto_cancel in any::<bool>(),
+        ) {
+            const SWAP_PATH_LEN: usize = 3;
+            const ALL: usize = create_order_calldata_len(SWAP_PATH_LEN);
+            let bobcat_swap_path = swap_path.map(EvmCdAddress::new);
+            let params = OrderParams {
+                addresses: OrderAddresses {
+                    receiver: addresses[0],
+                    cancellation_receiver: addresses[1],
+                    callback_contract: addresses[2],
+                    ui_fee_receiver: addresses[3],
+                    market: addresses[4],
+                    initial_collateral_token: addresses[5],
+                    swap_path: &bobcat_swap_path,
+                },
+                numbers: OrderNumbers {
+                    size_delta_usd: numbers[0],
+                    initial_collateral_delta_amount: numbers[1],
+                    trigger_price: numbers[2],
+                    acceptable_price: numbers[3],
+                    execution_fee: numbers[4],
+                    callback_gas_limit: numbers[5],
+                    min_output_amount: numbers[6],
+                    valid_from_time: numbers[7],
+                },
+                decrease_position_swap_type: DecreasePositionSwapType::SwapPnlTokenToCollateralToken,
+                is_long,
+                should_unwrap_native_token,
+                auto_cancel,
+            };
+            let expected = createOrderCall {
+                params: SliceCreateOrderParams {
+                    addresses: SliceCreateOrderParamsAddresses {
+                        receiver: AlloyAddress::from(addresses[0]),
+                        cancellationReceiver: AlloyAddress::from(addresses[1]),
+                        callbackContract: AlloyAddress::from(addresses[2]),
+                        uiFeeReceiver: AlloyAddress::from(addresses[3]),
+                        market: AlloyAddress::from(addresses[4]),
+                        initialCollateralToken: AlloyAddress::from(addresses[5]),
+                        swapPath: swap_path.into_iter().map(AlloyAddress::from).collect(),
+                    },
+                    numbers: SliceCreateOrderParamsNumbers {
+                        sizeDeltaUsd: alloy_u(numbers[0]),
+                        initialCollateralDeltaAmount: alloy_u(numbers[1]),
+                        triggerPrice: alloy_u(numbers[2]),
+                        acceptablePrice: alloy_u(numbers[3]),
+                        executionFee: alloy_u(numbers[4]),
+                        callbackGasLimit: alloy_u(numbers[5]),
+                        minOutputAmount: alloy_u(numbers[6]),
+                        validFromTime: alloy_u(numbers[7]),
+                    },
+                    orderType: DecreaseOrderType::StopLoss as u8,
+                    decreasePositionSwapType: DecreasePositionSwapType::SwapPnlTokenToCollateralToken as u8,
+                    isLong: is_long,
+                    shouldUnwrapNativeToken: should_unwrap_native_token,
+                    autoCancel: auto_cancel,
+                    referralCode: FixedBytes::ZERO,
+                    dataList: Vec::new(),
+                },
+            }
+            .abi_encode();
+            let actual = make_fn_create_decrease_order_slice::<SWAP_PATH_LEN, ALL>(
+                params,
+                DecreaseOrderType::StopLoss,
+            );
+            prop_assert_eq!(actual.as_slice(), expected);
+        }
+
+        #[test]
         fn claim_funding_fees_slice_matches_alloy(
             markets in any::<[[u8; 20]; 2]>(),
             tokens in any::<[[u8; 20]; 3]>(),
