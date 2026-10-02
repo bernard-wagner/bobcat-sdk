@@ -1,4 +1,4 @@
-use bobcat_maths::U;
+use bobcat_maths::{I, U};
 
 use bobcat_storage::{Keccak256, keccak256_builder};
 
@@ -626,7 +626,7 @@ impl EvmCdDeserialise for usize {
 }
 
 macro_rules! evm_cd_uint {
-    ($name:ident, $bytes:literal, $abi:literal) => {
+    ($name:ident, $bits:literal, $bytes:literal) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $name([u8; $bytes]);
 
@@ -656,6 +656,21 @@ macro_rules! evm_cd_uint {
             }
         }
 
+        impl From<$name> for U {
+            fn from(value: $name) -> Self {
+                let mut word = [0u8; 32];
+                word[32 - $bytes..].copy_from_slice(value.as_array());
+                Self::from(word)
+            }
+        }
+
+        impl From<U> for $name {
+            fn from(value: U) -> Self {
+                let word: [u8; 32] = value.into();
+                Self::new(word[32 - $bytes..].try_into().unwrap())
+            }
+        }
+
         impl AsRef<[u8; $bytes]> for $name {
             fn as_ref(&self) -> &[u8; $bytes] {
                 self.as_array()
@@ -675,7 +690,7 @@ macro_rules! evm_cd_uint {
             }
 
             fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
-                hasher.update($abi)
+                hasher.update(b"uint").update_usize($bits)
             }
         }
 
@@ -692,14 +707,177 @@ macro_rules! evm_cd_uint {
             }
 
             fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
-                hasher.update($abi)
+                hasher.update(b"uint").update_usize($bits)
             }
         }
     };
 }
 
-evm_cd_uint!(EvmCdU24, 3, b"uint24");
-evm_cd_uint!(EvmCdU192, 24, b"uint192");
+macro_rules! evm_cd_int {
+    ($name:ident, $bits:literal, $bytes:literal) => {
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+        pub struct $name([u8; $bytes]);
+
+        impl $name {
+            pub const fn new(bytes: [u8; $bytes]) -> Self {
+                Self(bytes)
+            }
+
+            pub const fn into_array(self) -> [u8; $bytes] {
+                self.0
+            }
+
+            pub const fn as_array(&self) -> &[u8; $bytes] {
+                &self.0
+            }
+        }
+
+        impl From<[u8; $bytes]> for $name {
+            fn from(bytes: [u8; $bytes]) -> Self {
+                Self::new(bytes)
+            }
+        }
+
+        impl From<$name> for [u8; $bytes] {
+            fn from(value: $name) -> Self {
+                value.into_array()
+            }
+        }
+
+        impl From<$name> for I {
+            fn from(value: $name) -> Self {
+                let extension = if value.0[0] & 0x80 == 0 { 0 } else { 0xff };
+                let mut word = [extension; 32];
+                word[32 - $bytes..].copy_from_slice(value.as_array());
+                Self::from(word)
+            }
+        }
+
+        impl From<I> for $name {
+            fn from(value: I) -> Self {
+                let word: [u8; 32] = value.into();
+                Self::new(word[32 - $bytes..].try_into().unwrap())
+            }
+        }
+
+        impl AsRef<[u8; $bytes]> for $name {
+            fn as_ref(&self) -> &[u8; $bytes] {
+                self.as_array()
+            }
+        }
+
+        impl AsRef<[u8]> for $name {
+            fn as_ref(&self) -> &[u8] {
+                self.as_array()
+            }
+        }
+
+        impl EvmCdSerialise for $name {
+            fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+                let extension = if self.0[0] & 0x80 == 0 { 0 } else { 0xff };
+                writer.write_all(&[extension; 32 - $bytes])?;
+                writer.write_all(&self.0)
+            }
+
+            fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                hasher.update(b"int").update_usize($bits)
+            }
+        }
+
+        impl EvmCdDeserialise for $name {
+            fixed_deserialise_buffer!([u8; 32]);
+
+            fn deserialise_reader<R: Read>(reader: &mut R) -> Result<Self, Error> {
+                let mut word = [0u8; 32];
+                reader.read_exact(&mut word)?;
+                let extension = if word[32 - $bytes] & 0x80 == 0 {
+                    0
+                } else {
+                    0xff
+                };
+                if word[..32 - $bytes].iter().any(|byte| *byte != extension) {
+                    return Err(invalid_data());
+                }
+                Ok(Self(word[32 - $bytes..].try_into().unwrap()))
+            }
+
+            fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                hasher.update(b"int").update_usize($bits)
+            }
+        }
+    };
+}
+
+macro_rules! evm_cd_integer_range {
+    ($uint_macro:ident, $int_macro:ident) => {
+        $uint_macro!(EvmCdU8, 8, 1);
+        $int_macro!(EvmCdI8, 8, 1);
+        $uint_macro!(EvmCdU16, 16, 2);
+        $int_macro!(EvmCdI16, 16, 2);
+        $uint_macro!(EvmCdU24, 24, 3);
+        $int_macro!(EvmCdI24, 24, 3);
+        $uint_macro!(EvmCdU32, 32, 4);
+        $int_macro!(EvmCdI32, 32, 4);
+        $uint_macro!(EvmCdU40, 40, 5);
+        $int_macro!(EvmCdI40, 40, 5);
+        $uint_macro!(EvmCdU48, 48, 6);
+        $int_macro!(EvmCdI48, 48, 6);
+        $uint_macro!(EvmCdU56, 56, 7);
+        $int_macro!(EvmCdI56, 56, 7);
+        $uint_macro!(EvmCdU64, 64, 8);
+        $int_macro!(EvmCdI64, 64, 8);
+        $uint_macro!(EvmCdU72, 72, 9);
+        $int_macro!(EvmCdI72, 72, 9);
+        $uint_macro!(EvmCdU80, 80, 10);
+        $int_macro!(EvmCdI80, 80, 10);
+        $uint_macro!(EvmCdU88, 88, 11);
+        $int_macro!(EvmCdI88, 88, 11);
+        $uint_macro!(EvmCdU96, 96, 12);
+        $int_macro!(EvmCdI96, 96, 12);
+        $uint_macro!(EvmCdU104, 104, 13);
+        $int_macro!(EvmCdI104, 104, 13);
+        $uint_macro!(EvmCdU112, 112, 14);
+        $int_macro!(EvmCdI112, 112, 14);
+        $uint_macro!(EvmCdU120, 120, 15);
+        $int_macro!(EvmCdI120, 120, 15);
+        $uint_macro!(EvmCdU128, 128, 16);
+        $int_macro!(EvmCdI128, 128, 16);
+        $uint_macro!(EvmCdU136, 136, 17);
+        $int_macro!(EvmCdI136, 136, 17);
+        $uint_macro!(EvmCdU144, 144, 18);
+        $int_macro!(EvmCdI144, 144, 18);
+        $uint_macro!(EvmCdU152, 152, 19);
+        $int_macro!(EvmCdI152, 152, 19);
+        $uint_macro!(EvmCdU160, 160, 20);
+        $int_macro!(EvmCdI160, 160, 20);
+        $uint_macro!(EvmCdU168, 168, 21);
+        $int_macro!(EvmCdI168, 168, 21);
+        $uint_macro!(EvmCdU176, 176, 22);
+        $int_macro!(EvmCdI176, 176, 22);
+        $uint_macro!(EvmCdU184, 184, 23);
+        $int_macro!(EvmCdI184, 184, 23);
+        $uint_macro!(EvmCdU192, 192, 24);
+        $int_macro!(EvmCdI192, 192, 24);
+        $uint_macro!(EvmCdU200, 200, 25);
+        $int_macro!(EvmCdI200, 200, 25);
+        $uint_macro!(EvmCdU208, 208, 26);
+        $int_macro!(EvmCdI208, 208, 26);
+        $uint_macro!(EvmCdU216, 216, 27);
+        $int_macro!(EvmCdI216, 216, 27);
+        $uint_macro!(EvmCdU224, 224, 28);
+        $int_macro!(EvmCdI224, 224, 28);
+        $uint_macro!(EvmCdU232, 232, 29);
+        $int_macro!(EvmCdI232, 232, 29);
+        $uint_macro!(EvmCdU240, 240, 30);
+        $int_macro!(EvmCdI240, 240, 30);
+        $uint_macro!(EvmCdU248, 248, 31);
+        $int_macro!(EvmCdI248, 248, 31);
+        $uint_macro!(EvmCdU256, 256, 32);
+        $int_macro!(EvmCdI256, 256, 32);
+    };
+}
+
+evm_cd_integer_range!(evm_cd_uint, evm_cd_int);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EvmCdAddress([u8; 20]);

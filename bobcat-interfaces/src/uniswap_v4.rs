@@ -8,6 +8,11 @@
 //! The quote builders target `IV4Quoter`'s single-pool exact-input and exact-output
 //! entrypoints. These quoter functions are intentionally non-view in Solidity.
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use bobcat_cd::{EvmCdAddress, EvmCdArray, EvmCdError, EvmCdSerialise, EvmCdWrite};
 use bobcat_maths::U;
 
@@ -35,7 +40,7 @@ pub struct PoolKey {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ExactInputSingle<'a> {
+pub struct ExactInputSingle<const HOOK_DATA_LEN: usize> {
     pub pool_key: PoolKey,
     pub zero_for_one: bool,
     pub amount_in: u128,
@@ -43,19 +48,39 @@ pub struct ExactInputSingle<'a> {
     /// Universal Router 2.1.1's optional per-hop minimum output/input price, scaled by 1e36.
     pub min_hop_price_x36: U,
     /// Opaque bytes forwarded unchanged to the pool's hook callbacks.
-    pub hook_data: &'a [u8],
+    pub hook_data: [u8; HOOK_DATA_LEN],
+}
+
+#[cfg(feature = "alloc")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExactInputSingleVec {
+    pub pool_key: PoolKey,
+    pub zero_for_one: bool,
+    pub amount_in: u128,
+    pub amount_out_minimum: u128,
+    pub min_hop_price_x36: U,
+    pub hook_data: Vec<u8>,
 }
 
 /// Parameters shared by `IV4Quoter.quoteExactInputSingle` and
 /// `IV4Quoter.quoteExactOutputSingle`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct QuoteExactSingleParams<'a> {
+pub struct QuoteExactSingleParams<const HOOK_DATA_LEN: usize> {
     pub pool_key: PoolKey,
     pub zero_for_one: bool,
     /// Input amount for an exact-input quote; output amount for an exact-output quote.
     pub exact_amount: u128,
     /// Opaque bytes forwarded unchanged to the pool's hook callbacks.
-    pub hook_data: &'a [u8],
+    pub hook_data: [u8; HOOK_DATA_LEN],
+}
+
+#[cfg(feature = "alloc")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QuoteExactSingleParamsVec {
+    pub pool_key: PoolKey,
+    pub zero_for_one: bool,
+    pub exact_amount: u128,
+    pub hook_data: Vec<u8>,
 }
 
 #[derive(Clone, Copy, EvmCdSerialise)]
@@ -67,27 +92,27 @@ struct DerivedPoolKey {
     hooks: EvmCdAddress,
 }
 
-#[derive(Clone, Copy, EvmCdSerialise)]
-struct DerivedQuoteExactSingleParams<'a> {
+#[derive(EvmCdSerialise)]
+struct DerivedQuoteExactSingleParams<HookData> {
     pool_key: DerivedPoolKey,
     zero_for_one: bool,
     exact_amount: u128,
-    hook_data: DerivedBytes<'a>,
+    hook_data: DerivedBytes<HookData>,
 }
 
-#[derive(Clone, Copy, EvmCdSerialise)]
-struct DerivedExactInputSingleParams<'a> {
+#[derive(EvmCdSerialise)]
+struct DerivedExactInputSingleParams<HookData> {
     pool_key: DerivedPoolKey,
     zero_for_one: bool,
     amount_in: u128,
     amount_out_minimum: u128,
     min_hop_price_x36: U,
-    hook_data: DerivedBytes<'a>,
+    hook_data: DerivedBytes<HookData>,
 }
 
 #[derive(EvmCdSerialise)]
-struct DerivedSwapParams<'a> {
-    params: DerivedExactInputSingleParams<'a>,
+struct DerivedSwapParams<HookData> {
+    params: DerivedExactInputSingleParams<HookData>,
 }
 
 #[derive(EvmCdSerialise)]
@@ -97,25 +122,31 @@ struct DerivedCurrencyAmount {
 }
 
 #[derive(EvmCdSerialise)]
-struct DerivedPlan<'a> {
-    actions: DerivedBytes<'a>,
-    params: EvmCdArray<DerivedEncodedBytes<DerivedPlanPayload<'a>>, 3, 3>,
+struct DerivedPlan<HookData> {
+    actions: DerivedBytes<[u8; 3]>,
+    params: EvmCdArray<DerivedEncodedBytes<DerivedPlanPayload<HookData>>, 3, 3>,
 }
 
 #[derive(EvmCdSerialise)]
 #[evm_selector]
-enum DerivedV4QuoterCall<'a> {
-    QuoteExactInputSingle(DerivedQuoteExactSingleParams<'a>),
-    QuoteExactOutputSingle(DerivedQuoteExactSingleParams<'a>),
+enum DerivedV4QuoterCall<HookData> {
+    #[evm_selector(
+        "quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))"
+    )]
+    QuoteExactInputSingle(DerivedQuoteExactSingleParams<HookData>),
+    #[evm_selector(
+        "quoteExactOutputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))"
+    )]
+    QuoteExactOutputSingle(DerivedQuoteExactSingleParams<HookData>),
 }
 
 #[derive(EvmCdSerialise)]
 #[evm_selector]
-enum DerivedUniversalRouterCall<'a> {
+enum DerivedUniversalRouterCall<HookData> {
     #[evm_selector("execute(bytes,bytes[],uint256)")]
     Execute(
-        DerivedBytes<'a>,
-        &'a [DerivedEncodedBytes<DerivedPlan<'a>>],
+        DerivedBytes<[u8; 1]>,
+        EvmCdArray<DerivedEncodedBytes<DerivedPlan<HookData>>, 1, 1>,
         U,
     ),
 }
@@ -153,10 +184,9 @@ impl EvmCdSerialise for DerivedI24 {
     }
 }
 
-#[derive(Clone, Copy)]
-struct DerivedBytes<'a>(&'a [u8]);
+struct DerivedBytes<T>(T);
 
-impl EvmCdSerialise for DerivedBytes<'_> {
+impl<T: AsRef<[u8]>> EvmCdSerialise for DerivedBytes<T> {
     fn serialise_writer<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
         U::from_u32(32).serialise_value(writer)?;
         self.serialise_abi_tail(writer)
@@ -167,7 +197,7 @@ impl EvmCdSerialise for DerivedBytes<'_> {
     }
 
     fn abi_tail_size(&self) -> usize {
-        32usize.saturating_add(padded_len(self.0.len()).unwrap_or(usize::MAX))
+        32usize.saturating_add(padded_len(self.0.as_ref().len()))
     }
 
     fn serialise_abi_head<W: EvmCdWrite>(
@@ -179,9 +209,10 @@ impl EvmCdSerialise for DerivedBytes<'_> {
     }
 
     fn serialise_abi_tail<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
-        U::from_usize(self.0.len()).serialise_value(writer)?;
-        writer.write_all(self.0)?;
-        write_padding(writer, self.0.len())
+        let bytes = self.0.as_ref();
+        U::from_usize(bytes.len()).serialise_value(writer)?;
+        writer.write_all(bytes)?;
+        write_padding(writer, bytes.len())
     }
 
     fn append_abi_type(
@@ -207,7 +238,7 @@ impl<T: EvmCdSerialise> EvmCdSerialise for DerivedEncodedBytes<T> {
     }
 
     fn abi_tail_size(&self) -> usize {
-        32usize.saturating_add(padded_len(self.encoded_len).unwrap_or(usize::MAX))
+        32usize.saturating_add(padded_len(self.encoded_len))
     }
 
     fn serialise_abi_head<W: EvmCdWrite>(
@@ -231,11 +262,11 @@ impl<T: EvmCdSerialise> EvmCdSerialise for DerivedEncodedBytes<T> {
     }
 }
 
-struct DerivedRawPayload<'a>(&'a [u8]);
+struct DerivedRawPayload<T>(T);
 
-impl EvmCdSerialise for DerivedRawPayload<'_> {
+impl<T: AsRef<[u8]>> EvmCdSerialise for DerivedRawPayload<T> {
     fn serialise_writer<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
-        writer.write_all(self.0)
+        writer.write_all(self.0.as_ref())
     }
 
     fn append_abi_type(
@@ -245,12 +276,12 @@ impl EvmCdSerialise for DerivedRawPayload<'_> {
     }
 }
 
-enum DerivedPlanPayload<'a> {
-    Swap(DerivedSwapParams<'a>),
-    Raw(DerivedRawPayload<'a>),
+enum DerivedPlanPayload<HookData> {
+    Swap(DerivedSwapParams<HookData>),
+    Raw(DerivedRawPayload<[u8; 64]>),
 }
 
-impl EvmCdSerialise for DerivedPlanPayload<'_> {
+impl<HookData: AsRef<[u8]>> EvmCdSerialise for DerivedPlanPayload<HookData> {
     fn serialise_writer<W: EvmCdWrite>(&self, writer: &mut W) -> Result<(), EvmCdError> {
         match self {
             Self::Swap(value) => value.serialise_writer(writer),
@@ -280,192 +311,239 @@ fn derived_pool_key(pool_key: PoolKey) -> DerivedPoolKey {
     }
 }
 
-impl<'a> From<&QuoteExactSingleParams<'a>> for DerivedQuoteExactSingleParams<'a> {
-    fn from(params: &QuoteExactSingleParams<'a>) -> Self {
-        Self {
-            pool_key: derived_pool_key(params.pool_key),
-            zero_for_one: params.zero_for_one,
-            exact_amount: params.exact_amount,
-            hook_data: DerivedBytes(params.hook_data),
-        }
+fn derived_quote<HookData>(
+    pool_key: PoolKey,
+    zero_for_one: bool,
+    exact_amount: u128,
+    hook_data: HookData,
+) -> DerivedQuoteExactSingleParams<HookData> {
+    DerivedQuoteExactSingleParams {
+        pool_key: derived_pool_key(pool_key),
+        zero_for_one,
+        exact_amount,
+        hook_data: DerivedBytes(hook_data),
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EncodeError {
-    LengthOverflow,
-    BufferTooSmall { required: usize },
-    SerialisationFailed,
 }
 
 const PLAN_BASE_LENGTH: usize = 864;
 const CALLDATA_BASE_LENGTH: usize = 1124;
 const QUOTE_EXACT_SINGLE_BASE_LENGTH: usize = 324;
 
-fn padded_len(length: usize) -> Option<usize> {
-    length.checked_add(31).map(|n| n & !31)
+const fn padded_len(length: usize) -> usize {
+    let Some(padded) = length.checked_add(31) else {
+        panic!("hook data length overflows calldata length");
+    };
+    padded & !31
 }
 
-/// Required output length for [`make_fn_execute_exact_input_single`].
-pub fn exact_input_single_calldata_len(hook_data_len: usize) -> Result<usize, EncodeError> {
-    CALLDATA_BASE_LENGTH
-        .checked_add(padded_len(hook_data_len).ok_or(EncodeError::LengthOverflow)?)
-        .ok_or(EncodeError::LengthOverflow)
+pub const fn exact_input_single_calldata_len(hook_data_len: usize) -> usize {
+    let Some(length) = CALLDATA_BASE_LENGTH.checked_add(padded_len(hook_data_len)) else {
+        panic!("hook data length overflows calldata length");
+    };
+    length
 }
 
-/// Required output length for either single-pool `IV4Quoter` quote builder.
-pub fn quote_exact_single_calldata_len(hook_data_len: usize) -> Result<usize, EncodeError> {
-    QUOTE_EXACT_SINGLE_BASE_LENGTH
-        .checked_add(padded_len(hook_data_len).ok_or(EncodeError::LengthOverflow)?)
-        .ok_or(EncodeError::LengthOverflow)
+pub const fn quote_exact_single_calldata_len(hook_data_len: usize) -> usize {
+    let Some(length) = QUOTE_EXACT_SINGLE_BASE_LENGTH.checked_add(padded_len(hook_data_len)) else {
+        panic!("hook data length overflows calldata length");
+    };
+    length
 }
 
-fn write_derived_quote(
-    output: &mut [u8],
-    required: usize,
-    call: DerivedV4QuoterCall<'_>,
-) -> Result<usize, EncodeError> {
-    if output.len() < required {
-        return Err(EncodeError::BufferTooSmall { required });
-    }
-    let written = call
-        .write_slice(&mut output[..required])
-        .map_err(|_| EncodeError::SerialisationFailed)?
-        .len();
-    if written != required {
-        return Err(EncodeError::SerialisationFailed);
-    }
-    Ok(written)
+fn encode_array<const ALL: usize>(call: &impl EvmCdSerialise, expected: usize) -> [u8; ALL] {
+    assert_eq!(ALL, expected, "calldata output array has the wrong length");
+    let mut output = [0; ALL];
+    call.serialise(&mut output)
+        .expect("Uniswap V4 calldata serialization failed");
+    output
 }
 
-/// Encode `IV4Quoter.quoteExactInputSingle` calldata using `bobcat-cd-derive`.
-///
-/// The function returns `(uint256 amountOut, uint256 gasEstimate)`, encoded as two consecutive
-/// ABI words in returndata.
-pub fn make_fn_quote_exact_input_single(
-    output: &mut [u8],
-    params: &QuoteExactSingleParams<'_>,
-) -> Result<usize, EncodeError> {
-    let required = quote_exact_single_calldata_len(params.hook_data.len())?;
-    write_derived_quote(
-        output,
+#[cfg(feature = "alloc")]
+fn encode_vec(call: &impl EvmCdSerialise) -> Vec<u8> {
+    let mut output = Vec::new();
+    call.serialise(&mut output)
+        .expect("Uniswap V4 calldata serialization failed");
+    output
+}
+
+pub fn make_fn_quote_exact_input_single_array<const HOOK_DATA_LEN: usize, const ALL: usize>(
+    params: QuoteExactSingleParams<HOOK_DATA_LEN>,
+) -> [u8; ALL] {
+    let required = quote_exact_single_calldata_len(HOOK_DATA_LEN);
+    encode_array(
+        &DerivedV4QuoterCall::QuoteExactInputSingle(derived_quote(
+            params.pool_key,
+            params.zero_for_one,
+            params.exact_amount,
+            params.hook_data,
+        )),
         required,
-        DerivedV4QuoterCall::QuoteExactInputSingle(params.into()),
     )
 }
 
-/// Encode `IV4Quoter.quoteExactOutputSingle` calldata using `bobcat-cd-derive`.
+/// Encode `quoteExactInputSingle` with empty hook data.
 ///
-/// The function returns `(uint256 amountIn, uint256 gasEstimate)`, encoded as two consecutive ABI
-/// words in returndata.
-pub fn make_fn_quote_exact_output_single(
-    output: &mut [u8],
-    params: &QuoteExactSingleParams<'_>,
-) -> Result<usize, EncodeError> {
-    let required = quote_exact_single_calldata_len(params.hook_data.len())?;
-    write_derived_quote(
-        output,
+/// The hook-data and calldata lengths are fixed by this function, so callers do not need to
+/// provide either const generic explicitly.
+pub fn make_fn_quote_exact_input_zero_hooks(
+    params: QuoteExactSingleParams<0>,
+) -> [u8; QUOTE_EXACT_SINGLE_BASE_LENGTH] {
+    make_fn_quote_exact_input_single_array(params)
+}
+
+pub fn make_fn_quote_exact_output_single_array<const HOOK_DATA_LEN: usize, const ALL: usize>(
+    params: QuoteExactSingleParams<HOOK_DATA_LEN>,
+) -> [u8; ALL] {
+    let required = quote_exact_single_calldata_len(HOOK_DATA_LEN);
+    encode_array(
+        &DerivedV4QuoterCall::QuoteExactOutputSingle(derived_quote(
+            params.pool_key,
+            params.zero_for_one,
+            params.exact_amount,
+            params.hook_data,
+        )),
         required,
-        DerivedV4QuoterCall::QuoteExactOutputSingle(params.into()),
     )
 }
 
-/// Encode an exact-input, single-pool V4 swap for Universal Router 2.1.1.
-///
-/// The generated plan settles at most `amount_in` from the caller and sends at least
-/// `amount_out_minimum` back to the caller. ERC-20 input requires the normal Permit2 token
-/// approval and Permit2 allowance for the target router. `hook_data` is ABI-encoded as dynamic
-/// bytes and forwarded unchanged; `pool_key.hooks` remains the separate hook address.
-pub fn make_fn_execute_exact_input_single(
-    output: &mut [u8],
-    swap: &ExactInputSingle<'_>,
-    deadline: &U,
-) -> Result<usize, EncodeError> {
-    let hook_padded = padded_len(swap.hook_data.len()).ok_or(EncodeError::LengthOverflow)?;
-    let required = CALLDATA_BASE_LENGTH
-        .checked_add(hook_padded)
-        .ok_or(EncodeError::LengthOverflow)?;
-    if output.len() < required {
-        return Err(EncodeError::BufferTooSmall { required });
-    }
+#[cfg(feature = "alloc")]
+pub fn make_fn_quote_exact_input_single_vec(params: QuoteExactSingleParamsVec) -> Vec<u8> {
+    quote_exact_single_calldata_len(params.hook_data.len());
+    encode_vec(&DerivedV4QuoterCall::QuoteExactInputSingle(derived_quote(
+        params.pool_key,
+        params.zero_for_one,
+        params.exact_amount,
+        params.hook_data,
+    )))
+}
 
+#[cfg(feature = "alloc")]
+pub fn make_fn_quote_exact_output_single_vec(params: QuoteExactSingleParamsVec) -> Vec<u8> {
+    quote_exact_single_calldata_len(params.hook_data.len());
+    encode_vec(&DerivedV4QuoterCall::QuoteExactOutputSingle(derived_quote(
+        params.pool_key,
+        params.zero_for_one,
+        params.exact_amount,
+        params.hook_data,
+    )))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn derived_execute_call<HookData: AsRef<[u8]>>(
+    pool_key: PoolKey,
+    zero_for_one: bool,
+    amount_in: u128,
+    amount_out_minimum: u128,
+    min_hop_price_x36: U,
+    hook_data: HookData,
+    deadline: U,
+) -> (DerivedUniversalRouterCall<HookData>, usize) {
+    let hook_padded = padded_len(hook_data.as_ref().len());
+    let required = exact_input_single_calldata_len(hook_data.as_ref().len());
     let plan_len = PLAN_BASE_LENGTH
         .checked_add(hook_padded)
-        .ok_or(EncodeError::LengthOverflow)?;
+        .expect("hook data length overflows plan length");
     let swap_param_len = 384usize
         .checked_add(hook_padded)
-        .ok_or(EncodeError::LengthOverflow)?;
-    let currency_in = if swap.zero_for_one {
-        swap.pool_key.currency0
+        .expect("hook data length overflows swap parameter length");
+    let currency_in = if zero_for_one {
+        pool_key.currency0
     } else {
-        swap.pool_key.currency1
+        pool_key.currency1
     };
-    let currency_out = if swap.zero_for_one {
-        swap.pool_key.currency1
+    let currency_out = if zero_for_one {
+        pool_key.currency1
     } else {
-        swap.pool_key.currency0
+        pool_key.currency0
     };
-    let commands = [COMMAND_V4_SWAP];
-    let actions = [
-        ACTION_SWAP_EXACT_IN_SINGLE,
-        ACTION_SETTLE_ALL,
-        ACTION_TAKE_ALL,
-    ];
     let settle = DerivedCurrencyAmount {
         currency: EvmCdAddress::new(currency_in),
-        amount: swap.amount_in,
+        amount: amount_in,
     }
     .to_evm_array()
-    .map_err(|_| EncodeError::SerialisationFailed)?;
+    .expect("failed to serialize the settle parameter");
     let take = DerivedCurrencyAmount {
         currency: EvmCdAddress::new(currency_out),
-        amount: swap.amount_out_minimum,
+        amount: amount_out_minimum,
     }
     .to_evm_array()
-    .map_err(|_| EncodeError::SerialisationFailed)?;
+    .expect("failed to serialize the take parameter");
     let plan = DerivedPlan {
-        actions: DerivedBytes(&actions),
+        actions: DerivedBytes([
+            ACTION_SWAP_EXACT_IN_SINGLE,
+            ACTION_SETTLE_ALL,
+            ACTION_TAKE_ALL,
+        ]),
         params: EvmCdArray::try_from_array(
             [
                 DerivedEncodedBytes {
                     value: DerivedPlanPayload::Swap(DerivedSwapParams {
                         params: DerivedExactInputSingleParams {
-                            pool_key: derived_pool_key(swap.pool_key),
-                            zero_for_one: swap.zero_for_one,
-                            amount_in: swap.amount_in,
-                            amount_out_minimum: swap.amount_out_minimum,
-                            min_hop_price_x36: swap.min_hop_price_x36,
-                            hook_data: DerivedBytes(swap.hook_data),
+                            pool_key: derived_pool_key(pool_key),
+                            zero_for_one,
+                            amount_in,
+                            amount_out_minimum,
+                            min_hop_price_x36,
+                            hook_data: DerivedBytes(hook_data),
                         },
                     }),
                     encoded_len: swap_param_len,
                 },
                 DerivedEncodedBytes {
-                    value: DerivedPlanPayload::Raw(DerivedRawPayload(&settle)),
-                    encoded_len: settle.len(),
+                    value: DerivedPlanPayload::Raw(DerivedRawPayload(settle)),
+                    encoded_len: 64,
                 },
                 DerivedEncodedBytes {
-                    value: DerivedPlanPayload::Raw(DerivedRawPayload(&take)),
-                    encoded_len: take.len(),
+                    value: DerivedPlanPayload::Raw(DerivedRawPayload(take)),
+                    encoded_len: 64,
                 },
             ],
             3,
         )
-        .map_err(|_| EncodeError::SerialisationFailed)?,
+        .expect("failed to construct the V4 action parameters"),
     };
-    let inputs = [DerivedEncodedBytes {
-        value: plan,
-        encoded_len: plan_len,
-    }];
-    let call = DerivedUniversalRouterCall::Execute(DerivedBytes(&commands), &inputs, *deadline);
-    let written = call
-        .write_slice(&mut output[..required])
-        .map_err(|_| EncodeError::SerialisationFailed)?
-        .len();
-    if written != required {
-        return Err(EncodeError::SerialisationFailed);
-    }
-    Ok(written)
+    let inputs = EvmCdArray::try_from_array(
+        [DerivedEncodedBytes {
+            value: plan,
+            encoded_len: plan_len,
+        }],
+        1,
+    )
+    .expect("failed to construct the Universal Router inputs");
+    (
+        DerivedUniversalRouterCall::Execute(DerivedBytes([COMMAND_V4_SWAP]), inputs, deadline),
+        required,
+    )
+}
+
+pub fn make_fn_execute_exact_input_single_array<const HOOK_DATA_LEN: usize, const ALL: usize>(
+    swap: ExactInputSingle<HOOK_DATA_LEN>,
+    deadline: U,
+) -> [u8; ALL] {
+    let (call, required) = derived_execute_call(
+        swap.pool_key,
+        swap.zero_for_one,
+        swap.amount_in,
+        swap.amount_out_minimum,
+        swap.min_hop_price_x36,
+        swap.hook_data,
+        deadline,
+    );
+    encode_array(&call, required)
+}
+
+#[cfg(feature = "alloc")]
+pub fn make_fn_execute_exact_input_single_vec(swap: ExactInputSingleVec, deadline: U) -> Vec<u8> {
+    let (call, _) = derived_execute_call(
+        swap.pool_key,
+        swap.zero_for_one,
+        swap.amount_in,
+        swap.amount_out_minimum,
+        swap.min_hop_price_x36,
+        swap.hook_data,
+        deadline,
+    );
+    encode_vec(&call)
 }
 
 #[cfg(test)]
@@ -514,55 +592,55 @@ mod tests {
         "abcdef0000000000000000000000000000000000000000000000000000000000",
     );
 
-    fn fixture() -> QuoteExactSingleParams<'static> {
+    fn pool_key() -> PoolKey {
+        PoolKey {
+            currency0: [0; 20],
+            currency1: [0x11; 20],
+            fee: [0x00, 0x01, 0xf4],
+            tick_spacing: [0xff, 0xff, 0xf6],
+            hooks: [0x22; 20],
+        }
+    }
+
+    fn fixture() -> QuoteExactSingleParams<3> {
         QuoteExactSingleParams {
-            pool_key: PoolKey {
-                currency0: [0; 20],
-                currency1: [0x11; 20],
-                fee: [0x00, 0x01, 0xf4],
-                tick_spacing: [0xff, 0xff, 0xf6],
-                hooks: [0x22; 20],
-            },
+            pool_key: pool_key(),
             zero_for_one: false,
             exact_amount: 123_456,
-            hook_data: &[0xab, 0xcd, 0xef],
+            hook_data: [0xab, 0xcd, 0xef],
         }
     }
 
     #[test]
-    fn quote_exact_input_single_matches_solidity_abi() {
-        let params = fixture();
-        let mut output = [0x55; 356];
-        let written = make_fn_quote_exact_input_single(&mut output, &params).unwrap();
-        let expected = const_hex::decode(INPUT_FIXTURE).unwrap();
+    fn fixed_quote_type_owns_const_sized_hook_data() {
+        let encoded: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
+        let expected: [u8; 356] = const_hex::decode(INPUT_FIXTURE)
+            .unwrap()
+            .try_into()
+            .unwrap();
 
-        assert_eq!(written, expected.len());
-        assert_eq!(&output[..written], expected);
+        assert_eq!(encoded, expected);
     }
 
     #[test]
-    fn quote_exact_output_single_uses_output_selector() {
-        let params = fixture();
-        let mut input = [0; 356];
-        let mut output = [0; 356];
-        make_fn_quote_exact_input_single(&mut input, &params).unwrap();
-        make_fn_quote_exact_output_single(&mut output, &params).unwrap();
+    fn exact_output_quote_uses_output_selector_and_same_body() {
+        let input: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
+        let output: [u8; 356] = make_fn_quote_exact_output_single_array(fixture());
 
         assert_eq!(&output[..4], &[0x58, 0x73, 0x30, 0x73]);
         assert_eq!(&output[4..], &input[4..]);
     }
 
     #[test]
-    fn quote_exact_single_handles_true_and_empty_hook_data() {
-        let mut params = fixture();
-        params.zero_for_one = true;
-        params.hook_data = &[];
-        let mut output = [0x55; 324];
+    fn empty_hook_data_is_carried_by_the_zero_length_type() {
+        let params = QuoteExactSingleParams {
+            pool_key: pool_key(),
+            zero_for_one: true,
+            exact_amount: 123_456,
+            hook_data: [],
+        };
+        let output = make_fn_quote_exact_input_zero_hooks(params);
 
-        assert_eq!(
-            make_fn_quote_exact_input_single(&mut output, &params),
-            Ok(324)
-        );
         assert_eq!(&output[..4], &[0xaa, 0x9d, 0x21, 0xcb]);
         assert_eq!(output[227], 1);
         assert_eq!(&output[292..324], &[0; 32]);
@@ -582,11 +660,9 @@ mod tests {
             amount_in: 123,
             amount_out_minimum: 45,
             min_hop_price_x36: U::from_u8(7),
-            hook_data: &[0xab, 0xcd, 0xef],
+            hook_data: [0xab, 0xcd, 0xef],
         };
-        let mut actual = [0x55; 1156];
-        let written =
-            make_fn_execute_exact_input_single(&mut actual, &swap, &U::from_u8(9)).unwrap();
+        let actual: [u8; 1156] = make_fn_execute_exact_input_single_array(swap, U::from_u8(9));
 
         let swap_param = (OracleExactInputSingleParams {
             poolKey: OraclePoolKey {
@@ -600,7 +676,7 @@ mod tests {
             amountIn: swap.amount_in,
             amountOutMinimum: swap.amount_out_minimum,
             minHopPriceX36: AlloyU256::from(7),
-            hookData: Bytes::copy_from_slice(swap.hook_data),
+            hookData: Bytes::copy_from_slice(&swap.hook_data),
         },)
             .abi_encode_params();
         let settle =
@@ -630,24 +706,66 @@ mod tests {
         }
         .abi_encode();
 
-        assert_eq!(written, expected.len());
-        assert_eq!(&actual[..written], expected);
+        assert_eq!(actual.to_vec(), expected);
     }
 
     #[test]
-    fn quote_exact_single_checks_lengths() {
-        assert_eq!(quote_exact_single_calldata_len(0), Ok(324));
-        assert_eq!(quote_exact_single_calldata_len(1), Ok(356));
-        assert_eq!(
-            quote_exact_single_calldata_len(usize::MAX),
-            Err(EncodeError::LengthOverflow)
+    fn length_helpers_return_plain_lengths() {
+        assert_eq!(quote_exact_single_calldata_len(0), 324);
+        assert_eq!(quote_exact_single_calldata_len(1), 356);
+        assert_eq!(quote_exact_single_calldata_len(33), 388);
+    }
+
+    #[test]
+    #[should_panic(expected = "hook data length overflows calldata length")]
+    fn length_helpers_panic_on_overflow() {
+        let _ = quote_exact_single_calldata_len(usize::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "calldata output array has the wrong length")]
+    fn fixed_builders_panic_for_the_wrong_array_length() {
+        let _: [u8; 355] = make_fn_quote_exact_input_single_array(fixture());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn quote_vec_variant_matches_const_sized_variant() {
+        let fixed: [u8; 356] = make_fn_quote_exact_input_single_array(fixture());
+        let dynamic = make_fn_quote_exact_input_single_vec(QuoteExactSingleParamsVec {
+            pool_key: pool_key(),
+            zero_for_one: false,
+            exact_amount: 123_456,
+            hook_data: vec![0xab, 0xcd, 0xef],
+        });
+
+        assert_eq!(fixed.to_vec(), dynamic);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn execute_vec_variant_matches_const_sized_variant() {
+        let fixed_swap = ExactInputSingle {
+            pool_key: pool_key(),
+            zero_for_one: false,
+            amount_in: 123,
+            amount_out_minimum: 45,
+            min_hop_price_x36: U::from_u8(7),
+            hook_data: [0xab, 0xcd, 0xef],
+        };
+        let fixed: [u8; 1156] = make_fn_execute_exact_input_single_array(fixed_swap, U::from_u8(9));
+        let dynamic = make_fn_execute_exact_input_single_vec(
+            ExactInputSingleVec {
+                pool_key: pool_key(),
+                zero_for_one: false,
+                amount_in: 123,
+                amount_out_minimum: 45,
+                min_hop_price_x36: U::from_u8(7),
+                hook_data: vec![0xab, 0xcd, 0xef],
+            },
+            U::from_u8(9),
         );
 
-        let params = fixture();
-        let mut output = [0; 355];
-        assert_eq!(
-            make_fn_quote_exact_input_single(&mut output, &params),
-            Err(EncodeError::BufferTooSmall { required: 356 })
-        );
+        assert_eq!(fixed.to_vec(), dynamic);
     }
 }

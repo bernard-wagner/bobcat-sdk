@@ -614,6 +614,17 @@ fn static_selector_enum_serialised_size(data: &DataEnum) -> Option<usize> {
         .then_some(size)
 }
 
+fn evm_cd_integer_abi(name: &str) -> Option<(&'static str, usize)> {
+    let (prefix, width) = if let Some(width) = name.strip_prefix("EvmCdU") {
+        ("uint", width)
+    } else {
+        ("int", name.strip_prefix("EvmCdI")?)
+    };
+    let bits: usize = width.parse().ok()?;
+    ((8..=256).contains(&bits) && bits.is_multiple_of(8) && width == bits.to_string())
+        .then_some((prefix, bits))
+}
+
 fn static_abi_value_size(ty: &Type) -> Option<usize> {
     match ty {
         Type::Path(path) if path.qself.is_none() => {
@@ -621,8 +632,9 @@ fn static_abi_value_size(ty: &Type) -> Option<usize> {
             if !matches!(segment.arguments, syn::PathArguments::None) {
                 return None;
             }
-            matches!(
-                segment.ident.to_string().as_str(),
+            let name = segment.ident.to_string();
+            (matches!(
+                name.as_str(),
                 "U" | "bool"
                     | "u8"
                     | "u16"
@@ -631,10 +643,8 @@ fn static_abi_value_size(ty: &Type) -> Option<usize> {
                     | "u128"
                     | "usize"
                     | "EvmCdAddress"
-                    | "EvmCdU24"
-                    | "EvmCdU192"
                     | "Address"
-            )
+            ) || evm_cd_integer_abi(&name).is_some())
             .then_some(32)
         }
         Type::Array(array)
@@ -748,6 +758,11 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
             Type::Path(elem) if elem.qself.is_none() && elem.path.is_ident("u8")
         )
     };
+    if matches!(segment.arguments, syn::PathArguments::None)
+        && let Some((prefix, bits)) = evm_cd_integer_abi(&name)
+    {
+        return Some(format!("{prefix}{bits}").into_bytes());
+    }
     match name.as_str() {
         "U" => Some(b"uint256".to_vec()),
         "bool" => Some(b"bool".to_vec()),
@@ -758,8 +773,6 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
         "u128" => Some(b"uint128".to_vec()),
         "usize" => Some(b"uint32".to_vec()),
         "EvmCdAddress" | "Address" => Some(b"address".to_vec()),
-        "EvmCdU24" => Some(b"uint24".to_vec()),
-        "EvmCdU192" => Some(b"uint192".to_vec()),
         "EvmCdString" => Some(b"string".to_vec()),
         "Vec" => {
             let elem = first_type_arg()?;
@@ -1290,8 +1303,13 @@ mod tests {
         assert_eq!(abi("usize"), "uint32");
         assert_eq!(abi("EvmCdAddress"), "address");
         assert_eq!(abi("Address"), "address");
-        assert_eq!(abi("EvmCdU24"), "uint24");
-        assert_eq!(abi("bobcat_cd::EvmCdU192"), "uint192");
+        for bits in (8..=256).step_by(8) {
+            assert_eq!(abi(&format!("EvmCdU{bits}")), format!("uint{bits}"));
+            assert_eq!(
+                abi(&format!("bobcat_cd::EvmCdI{bits}")),
+                format!("int{bits}")
+            );
+        }
         assert_eq!(abi("[u8; 4]"), "bytes4");
         assert_eq!(abi("[u8; 20]"), "bytes20");
         assert_eq!(abi("Vec<u8>"), "bytes");
@@ -1314,6 +1332,10 @@ mod tests {
             "&Name",     // borrowed non-slice value
             "&[Name]",   // slice element ABI is only known via its impl
             "[u32; 4]",  // SDK implements [u8; N] only
+            "EvmCdU0",   // outside Solidity's integer range
+            "EvmCdI7",   // not a whole-byte Solidity integer width
+            "EvmCdU264", // outside Solidity's integer range
+            "EvmCdI024", // noncanonical generated type name
         ] {
             let ty: Type = syn::parse_str(ty_str).unwrap();
             assert!(
