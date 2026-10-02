@@ -11,7 +11,7 @@ repository = "https://github.com/stylus-developers-guild/bobcat-sdk"
 all-features = true
 
 [features]
-alloc = []
+alloc = ["bobcat-cd/alloc"]
 
 [lib]
 name = "bobcat_interfaces"

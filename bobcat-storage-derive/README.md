@@ -16,7 +16,7 @@ pub struct Version<C: Cap> {
 // structure being passed around.
 
 #[derive(EvmStorage, Debug, Clone)]
-#[evm_domain("superposition.storage")]
+#[evm_domain("superposition")]
 pub struct Storage<CVer: Cap, CDomain: Cap> {
     pub something: String,
     pub version: EvmBox<CVer, Version<CVer>>,

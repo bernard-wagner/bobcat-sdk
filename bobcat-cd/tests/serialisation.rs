@@ -9,6 +9,7 @@ use bobcat_cd::{
 enum Call {
     Store(EvmCdAddress, EvmCdArray<u16, 0, 3>),
     SetCount(usize),
+    SetEnabled(bool),
 }
 
 #[cfg(feature = "alloc")]
@@ -44,6 +45,7 @@ where
 
 #[test]
 fn built_in_deserialisers_provide_sufficient_buffers() {
+    assert_builtin_buffer_fits(&true);
     assert_builtin_buffer_fits(&7u8);
     assert_builtin_buffer_fits(&u32::MAX);
     assert_builtin_buffer_fits(&(u32::MAX as usize));
@@ -58,6 +60,39 @@ fn built_in_deserialisers_provide_sufficient_buffers() {
     assert_builtin_buffer_fits(&values);
 
     assert!(u8::new_buffer(33).is_err());
+}
+
+#[test]
+fn bool_uses_canonical_abi_encoding_and_selector() {
+    for value in [false, true] {
+        let call = Call::SetEnabled(value);
+        let mut encoded = Vec::new();
+        call.serialise(&mut encoded).unwrap();
+
+        assert_eq!(&encoded[..4], &const_keccak_sel(b"setEnabled(bool)"));
+        assert!(encoded[4..35].iter().all(|byte| *byte == 0));
+        assert_eq!(encoded[35], u8::from(value));
+        assert_eq!(
+            Call::deserialise_reader(&mut encoded.as_slice()).unwrap(),
+            call
+        );
+    }
+}
+
+#[test]
+fn bool_rejects_noncanonical_abi_words() {
+    let selector = const_keccak_sel(b"setEnabled(bool)");
+
+    let mut value_two = [0u8; 36];
+    value_two[..4].copy_from_slice(&selector);
+    value_two[35] = 2;
+    assert!(Call::deserialise_reader(&mut value_two.as_slice()).is_err());
+
+    let mut nonzero_padding = [0u8; 36];
+    nonzero_padding[..4].copy_from_slice(&selector);
+    nonzero_padding[4] = 1;
+    nonzero_padding[35] = 1;
+    assert!(Call::deserialise_reader(&mut nonzero_padding.as_slice()).is_err());
 }
 
 #[cfg(feature = "alloc")]

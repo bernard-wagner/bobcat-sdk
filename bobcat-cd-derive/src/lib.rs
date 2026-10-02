@@ -134,6 +134,26 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
                 }
             })
             .unwrap_or_default(),
+        (Data::Enum(data), Direction::Serialise) if evm_selector => {
+            static_selector_enum_serialised_size(data)
+                .map(|size| {
+                    quote! {
+                        pub fn to_evm_array(
+                            &self,
+                        ) -> ::core::result::Result<[u8; #size], #cd::serialisation::Error> {
+                            let mut output = [0u8; #size];
+                            let mut writer = output.as_mut_slice();
+                            <Self as #cd::serialisation::EvmCdSerialise>::serialise_writer(
+                                self,
+                                &mut writer,
+                            )?;
+                            debug_assert!(writer.is_empty());
+                            ::core::result::Result::Ok(output)
+                        }
+                    }
+                })
+                .unwrap_or_default()
+        }
         _ => TokenStream2::new(),
     };
 
@@ -582,6 +602,18 @@ fn static_struct_serialised_size(data: &DataStruct) -> Option<usize> {
     })
 }
 
+fn static_selector_enum_serialised_size(data: &DataEnum) -> Option<usize> {
+    let mut sizes = data.variants.iter().map(|variant| {
+        variant.fields.iter().try_fold(4usize, |size, field| {
+            size.checked_add(static_abi_value_size(&field.ty)?)
+        })
+    });
+    let size = sizes.next()??;
+    sizes
+        .all(|candidate| candidate == Some(size))
+        .then_some(size)
+}
+
 fn static_abi_value_size(ty: &Type) -> Option<usize> {
     match ty {
         Type::Path(path) if path.qself.is_none() => {
@@ -591,7 +623,17 @@ fn static_abi_value_size(ty: &Type) -> Option<usize> {
             }
             matches!(
                 segment.ident.to_string().as_str(),
-                "U" | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" | "EvmCdAddress" | "Address"
+                "U" | "bool"
+                    | "u8"
+                    | "u16"
+                    | "u32"
+                    | "u64"
+                    | "u128"
+                    | "usize"
+                    | "EvmCdAddress"
+                    | "EvmCdU24"
+                    | "EvmCdU192"
+                    | "Address"
             )
             .then_some(32)
         }
@@ -675,6 +717,14 @@ fn abi_type_name(ty: &Type) -> Option<Vec<u8>> {
             };
             Some(format!("bytes{n}").into_bytes())
         }
+        Type::Reference(reference) => {
+            let Type::Slice(slice) = reference.elem.as_ref() else {
+                return None;
+            };
+            let mut out = abi_type_name(&slice.elem)?;
+            out.extend_from_slice(b"[]");
+            Some(out)
+        }
         _ => None,
     }
 }
@@ -700,6 +750,7 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
     };
     match name.as_str() {
         "U" => Some(b"uint256".to_vec()),
+        "bool" => Some(b"bool".to_vec()),
         "u8" => Some(b"uint8".to_vec()),
         "u16" => Some(b"uint16".to_vec()),
         "u32" => Some(b"uint32".to_vec()),
@@ -707,6 +758,8 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
         "u128" => Some(b"uint128".to_vec()),
         "usize" => Some(b"uint32".to_vec()),
         "EvmCdAddress" | "Address" => Some(b"address".to_vec()),
+        "EvmCdU24" => Some(b"uint24".to_vec()),
+        "EvmCdU192" => Some(b"uint192".to_vec()),
         "EvmCdString" => Some(b"string".to_vec()),
         "Vec" => {
             let elem = first_type_arg()?;
@@ -1228,6 +1281,7 @@ mod tests {
     fn abi_type_names_match_the_sdk_trait_impls() {
         assert_eq!(abi("U"), "uint256");
         assert_eq!(abi("bobcat_maths::U"), "uint256");
+        assert_eq!(abi("bool"), "bool");
         assert_eq!(abi("u8"), "uint8");
         assert_eq!(abi("u16"), "uint16");
         assert_eq!(abi("u32"), "uint32");
@@ -1236,11 +1290,15 @@ mod tests {
         assert_eq!(abi("usize"), "uint32");
         assert_eq!(abi("EvmCdAddress"), "address");
         assert_eq!(abi("Address"), "address");
+        assert_eq!(abi("EvmCdU24"), "uint24");
+        assert_eq!(abi("bobcat_cd::EvmCdU192"), "uint192");
         assert_eq!(abi("[u8; 4]"), "bytes4");
         assert_eq!(abi("[u8; 20]"), "bytes20");
         assert_eq!(abi("Vec<u8>"), "bytes");
         assert_eq!(abi("Vec<U>"), "uint256[]");
         assert_eq!(abi("Vec<EvmCdAddress>"), "address[]");
+        assert_eq!(abi("&[EvmCdAddress]"), "address[]");
+        assert_eq!(abi("&[u8]"), "uint8[]");
         assert_eq!(abi("EvmCdArray<u8, 0, 4>"), "uint8[]");
         assert_eq!(abi("EvmCdArray<U, 0, 4>"), "uint256[]");
         assert_eq!(abi("EvmCdString<0, 32>"), "string");
@@ -1253,7 +1311,8 @@ mod tests {
             "Asset",     // derived enum -> uint8 (only known via its impl)
             "DogRecord", // derived struct -> tuple (only known via its impl)
             "T",         // generic parameter
-            "&[u8]",     // not a supported ABI type
+            "&Name",     // borrowed non-slice value
+            "&[Name]",   // slice element ABI is only known via its impl
             "[u32; 4]",  // SDK implements [u8; N] only
         ] {
             let ty: Type = syn::parse_str(ty_str).unwrap();

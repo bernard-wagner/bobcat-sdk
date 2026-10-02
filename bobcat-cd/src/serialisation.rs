@@ -531,6 +531,32 @@ impl EvmCdDeserialise for U {
     }
 }
 
+impl EvmCdSerialise for bool {
+    fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        u8::from(*self).serialise_value(writer)
+    }
+
+    fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+        hasher.update(b"bool")
+    }
+}
+
+impl EvmCdDeserialise for bool {
+    fixed_deserialise_buffer!([u8; 32]);
+
+    fn deserialise_reader<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        match u8::deserialise_reader(reader)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(invalid_data()),
+        }
+    }
+
+    fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+        hasher.update(b"bool")
+    }
+}
+
 macro_rules! for_ints {
     ($($ty:ty => $abi:literal),+ $(,)?) => {
         $(
@@ -598,6 +624,82 @@ impl EvmCdDeserialise for usize {
         hasher.update(b"uint32")
     }
 }
+
+macro_rules! evm_cd_uint {
+    ($name:ident, $bytes:literal, $abi:literal) => {
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct $name([u8; $bytes]);
+
+        impl $name {
+            pub const fn new(bytes: [u8; $bytes]) -> Self {
+                Self(bytes)
+            }
+
+            pub const fn into_array(self) -> [u8; $bytes] {
+                self.0
+            }
+
+            pub const fn as_array(&self) -> &[u8; $bytes] {
+                &self.0
+            }
+        }
+
+        impl From<[u8; $bytes]> for $name {
+            fn from(bytes: [u8; $bytes]) -> Self {
+                Self::new(bytes)
+            }
+        }
+
+        impl From<$name> for [u8; $bytes] {
+            fn from(value: $name) -> Self {
+                value.into_array()
+            }
+        }
+
+        impl AsRef<[u8; $bytes]> for $name {
+            fn as_ref(&self) -> &[u8; $bytes] {
+                self.as_array()
+            }
+        }
+
+        impl AsRef<[u8]> for $name {
+            fn as_ref(&self) -> &[u8] {
+                self.as_array()
+            }
+        }
+
+        impl EvmCdSerialise for $name {
+            fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+                writer.write_all(&[0; 32 - $bytes])?;
+                writer.write_all(&self.0)
+            }
+
+            fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                hasher.update($abi)
+            }
+        }
+
+        impl EvmCdDeserialise for $name {
+            fixed_deserialise_buffer!([u8; 32]);
+
+            fn deserialise_reader<R: Read>(reader: &mut R) -> Result<Self, Error> {
+                let mut word = [0u8; 32];
+                reader.read_exact(&mut word)?;
+                if word[..32 - $bytes].iter().any(|byte| *byte != 0) {
+                    return Err(invalid_data());
+                }
+                Ok(Self(word[32 - $bytes..].try_into().unwrap()))
+            }
+
+            fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                hasher.update($abi)
+            }
+        }
+    };
+}
+
+evm_cd_uint!(EvmCdU24, 3, b"uint24");
+evm_cd_uint!(EvmCdU192, 24, b"uint192");
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EvmCdAddress([u8; 20]);
@@ -816,6 +918,59 @@ impl<T: Eq, const MIN: usize, const CAP: usize> Eq for EvmCdArray<T, MIN, CAP> {
 impl<T, const MIN: usize, const CAP: usize> AsRef<[T]> for EvmCdArray<T, MIN, CAP> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
+    }
+}
+
+impl<T> EvmCdSerialise for &[T]
+where
+    T: EvmCdSerialise,
+{
+    fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        U::from_u32(32).serialise_value(writer)?;
+        self.serialise_abi_tail(writer)
+    }
+
+    fn is_abi_dynamic() -> bool {
+        true
+    }
+
+    fn abi_tail_size(&self) -> usize {
+        self.len()
+            .saturating_mul(T::abi_head_size())
+            .saturating_add(32)
+            .saturating_add(self.iter().fold(0usize, |size, value| {
+                size.saturating_add(value.abi_tail_size())
+            }))
+    }
+
+    fn serialise_abi_head<W: Write>(
+        &self,
+        tail_offset: usize,
+        writer: &mut W,
+    ) -> Result<(), Error> {
+        U::from_usize(tail_offset).serialise_value(writer)
+    }
+
+    fn serialise_abi_tail<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        U::from_usize(self.len()).serialise_value(writer)?;
+        let mut tail_offset = self
+            .len()
+            .checked_mul(T::abi_head_size())
+            .ok_or_else(invalid_data)?;
+        for value in *self {
+            value.serialise_abi_head(tail_offset, writer)?;
+            tail_offset = tail_offset
+                .checked_add(value.abi_tail_size())
+                .ok_or_else(invalid_data)?;
+        }
+        for value in *self {
+            value.serialise_abi_tail(writer)?;
+        }
+        Ok(())
+    }
+
+    fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+        T::append_abi_type(hasher).update(b"[]")
     }
 }
 

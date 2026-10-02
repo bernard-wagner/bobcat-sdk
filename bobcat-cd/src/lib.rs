@@ -4,8 +4,8 @@ pub mod serialisation;
 
 pub use serialisation::{
     Error as EvmCdError, EvmCdAddress, EvmCdArray, EvmCdArrayError, EvmCdDeserialise,
-    EvmCdSerialise, EvmCdString, EvmCdStringError, EvmCdWriteTarget, Read as EvmCdRead,
-    Write as EvmCdWrite,
+    EvmCdSerialise, EvmCdString, EvmCdStringError, EvmCdU24, EvmCdU192, EvmCdWriteTarget,
+    Read as EvmCdRead, Write as EvmCdWrite,
 };
 
 #[cfg(feature = "derive")]

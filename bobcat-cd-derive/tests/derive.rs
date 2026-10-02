@@ -1,6 +1,6 @@
 use bobcat_cd::{
     const_keccak_sel,
-    serialisation::{EvmCdDeserialise, EvmCdSerialise, EvmCdString},
+    serialisation::{EvmCdAddress, EvmCdDeserialise, EvmCdSerialise, EvmCdString},
 };
 use bobcat_cd_derive::{EvmCdDeserialise, EvmCdSerialise};
 
@@ -37,6 +37,12 @@ enum CustomSelector {
     Number,
     #[evm_selector("store(uint32)")]
     SetNumber(u32),
+}
+
+#[derive(Debug, PartialEq, Eq, EvmCdSerialise, EvmCdDeserialise)]
+#[evm_selector]
+enum FixedSizeCall {
+    CancelOrder([u8; 32]),
 }
 
 type Name = EvmCdString<0, 32>;
@@ -127,6 +133,12 @@ struct SolveArgs {
 #[evm_selector]
 enum SolverCall {
     Solve(SolveArgs),
+}
+
+#[derive(Debug, EvmCdSerialise)]
+#[evm_selector]
+enum BorrowedCall<'a> {
+    SetAddresses(&'a [EvmCdAddress]),
 }
 
 fn round_trip<T>(value: T)
@@ -241,6 +253,23 @@ fn generated_write_slice_rejects_a_short_buffer() {
 }
 
 #[test]
+fn serialises_borrowed_address_slices_as_address_arrays() {
+    let addresses = [EvmCdAddress::new([0x11; 20]), EvmCdAddress::new([0x22; 20])];
+    let mut encoded = Vec::new();
+
+    BorrowedCall::SetAddresses(&addresses)
+        .serialise(&mut encoded)
+        .unwrap();
+
+    assert_eq!(&encoded[..4], &const_keccak_sel(b"setAddresses(address[])"));
+    assert_eq!(encoded.len(), 4 + 32 + 32 + 2 * 32);
+    assert_eq!(encoded[35], 32);
+    assert_eq!(encoded[67], 2);
+    assert_eq!(&encoded[80..100], &[0x11; 20]);
+    assert_eq!(&encoded[112..132], &[0x22; 20]);
+}
+
+#[test]
 fn generated_to_evm_array_uses_the_compile_time_encoded_size() {
     let value = Named {
         small: 7,
@@ -251,6 +280,15 @@ fn generated_to_evm_array_uses_the_compile_time_encoded_size() {
 
     assert_eq!(encoded[31], 7);
     assert_eq!(&encoded[60..64], &0x1234_5678u32.to_be_bytes());
+}
+
+#[test]
+fn generated_to_evm_array_includes_a_fixed_size_call_selector() {
+    let key = [0x5a; 32];
+    let encoded: [u8; 36] = FixedSizeCall::CancelOrder(key).to_evm_array().unwrap();
+
+    assert_eq!(&encoded[..4], &const_keccak_sel(b"cancelOrder(bytes32)"));
+    assert_eq!(&encoded[4..], &key);
 }
 
 #[test]
