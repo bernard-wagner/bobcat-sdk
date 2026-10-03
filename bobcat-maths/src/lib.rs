@@ -1262,6 +1262,44 @@ impl U {
         checked_rooti(self, x)
     }
 
+    pub fn wrapping_ceil_div(&self, y: &Self) -> Self {
+        if y.is_zero() {
+            return U::ZERO;
+        }
+        self.wrapping_sub(&U::ONE)
+            .wrapping_div(y)
+            .wrapping_add(&U::ONE)
+    }
+
+    pub fn checked_ceil_div(&self, y: &Self) -> Self {
+        if y.is_zero() {
+            return U::ZERO;
+        }
+        let v = panic_on_err_overflow!(
+            checked_sub_opt(self, &U::ONE);
+            "checked ceil div checked sub overflow: {self}, y: {}",
+            U::ONE
+        );
+        let v = panic_on_err_overflow!(
+            checked_div_opt(&v, y);
+            "checked ceil div checked div overflow: {v}, y: {y}"
+        );
+        panic_on_err_overflow!(
+            checked_add_opt(&v, &U::ONE);
+            "checked ceil div checked add overflow: {v}, y: {}",
+            U::ONE
+        )
+    }
+
+    pub fn checked_ceil_div_opt(&self, y: &Self) -> Option<Self> {
+        if y.is_zero() {
+            return Some(U::ZERO);
+        }
+        self.checked_sub_opt(&U::ONE)?
+            .checked_div_opt(y)?
+            .checked_add_opt(&U::ONE)
+    }
+
     pub fn from_hex(x: &str) -> Option<U> {
         match const_hex::decode_to_array::<_, 32>(x) {
             Ok(v) => Some(U(v)),
