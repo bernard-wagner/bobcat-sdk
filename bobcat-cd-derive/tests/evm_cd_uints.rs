@@ -98,16 +98,12 @@ macro_rules! check_int_widths {
 }
 
 #[test]
-fn every_solidity_uint_width_round_trips_and_converts_to_u() {
+fn every_non_native_solidity_uint_width_round_trips_and_converts_to_u() {
     check_uint_widths!(
-        (8, EvmCdU8, b"uint8"),
-        (16, EvmCdU16, b"uint16"),
         (24, EvmCdU24, b"uint24"),
-        (32, EvmCdU32, b"uint32"),
         (40, EvmCdU40, b"uint40"),
         (48, EvmCdU48, b"uint48"),
         (56, EvmCdU56, b"uint56"),
-        (64, EvmCdU64, b"uint64"),
         (72, EvmCdU72, b"uint72"),
         (80, EvmCdU80, b"uint80"),
         (88, EvmCdU88, b"uint88"),
@@ -115,7 +111,6 @@ fn every_solidity_uint_width_round_trips_and_converts_to_u() {
         (104, EvmCdU104, b"uint104"),
         (112, EvmCdU112, b"uint112"),
         (120, EvmCdU120, b"uint120"),
-        (128, EvmCdU128, b"uint128"),
         (136, EvmCdU136, b"uint136"),
         (144, EvmCdU144, b"uint144"),
         (152, EvmCdU152, b"uint152"),
@@ -136,16 +131,12 @@ fn every_solidity_uint_width_round_trips_and_converts_to_u() {
 }
 
 #[test]
-fn every_solidity_int_width_round_trips_and_converts_to_i() {
+fn every_non_native_solidity_int_width_round_trips_and_converts_to_i() {
     check_int_widths!(
-        (8, EvmCdI8, b"int8"),
-        (16, EvmCdI16, b"int16"),
         (24, EvmCdI24, b"int24"),
-        (32, EvmCdI32, b"int32"),
         (40, EvmCdI40, b"int40"),
         (48, EvmCdI48, b"int48"),
         (56, EvmCdI56, b"int56"),
-        (64, EvmCdI64, b"int64"),
         (72, EvmCdI72, b"int72"),
         (80, EvmCdI80, b"int80"),
         (88, EvmCdI88, b"int88"),
@@ -153,7 +144,6 @@ fn every_solidity_int_width_round_trips_and_converts_to_i() {
         (104, EvmCdI104, b"int104"),
         (112, EvmCdI112, b"int112"),
         (120, EvmCdI120, b"int120"),
-        (128, EvmCdI128, b"int128"),
         (136, EvmCdI136, b"int136"),
         (144, EvmCdI144, b"int144"),
         (152, EvmCdI152, b"int152"),

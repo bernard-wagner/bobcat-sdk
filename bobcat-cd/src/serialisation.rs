@@ -617,6 +617,51 @@ for_ints! {
     u128 => b"uint128",
 }
 
+macro_rules! for_signed_ints {
+    ($($ty:ty => $abi:literal),+ $(,)?) => {
+        $(
+            impl EvmCdSerialise for $ty {
+                fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+                    let extension = if self.is_negative() { 0xff } else { 0 };
+                    writer.write_all(&[extension; 32 - size_of::<$ty>()])?;
+                    writer.write_all(&self.to_be_bytes())
+                }
+
+                fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                    hasher.update($abi)
+                }
+            }
+
+            impl EvmCdDeserialise for $ty {
+                fixed_deserialise_buffer!([u8; 32]);
+
+                fn deserialise_reader<R: Read>(reader: &mut R) -> Result<Self, Error> {
+                    let mut word = [0u8; 32];
+                    reader.read_exact(&mut word)?;
+                    let value_start = 32 - size_of::<$ty>();
+                    let extension = if word[value_start] & 0x80 == 0 { 0 } else { 0xff };
+                    if word[..value_start].iter().any(|byte| *byte != extension) {
+                        return Err(invalid_data());
+                    }
+                    Ok(<$ty>::from_be_bytes(word[value_start..].try_into().unwrap()))
+                }
+
+                fn append_abi_type(hasher: SelectorHasher) -> SelectorHasher {
+                    hasher.update($abi)
+                }
+            }
+        )+
+    };
+}
+
+for_signed_ints! {
+    i8 => b"int8",
+    i16 => b"int16",
+    i32 => b"int32",
+    i64 => b"int64",
+    i128 => b"int128",
+}
+
 impl EvmCdSerialise for usize {
     fn serialise_writer<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         <u32 as EvmCdSerialise>::serialise_value(
@@ -827,22 +872,14 @@ macro_rules! evm_cd_int {
 
 macro_rules! evm_cd_integer_range {
     ($uint_macro:ident, $int_macro:ident) => {
-        $uint_macro!(EvmCdU8, 8, 1);
-        $int_macro!(EvmCdI8, 8, 1);
-        $uint_macro!(EvmCdU16, 16, 2);
-        $int_macro!(EvmCdI16, 16, 2);
         $uint_macro!(EvmCdU24, 24, 3);
         $int_macro!(EvmCdI24, 24, 3);
-        $uint_macro!(EvmCdU32, 32, 4);
-        $int_macro!(EvmCdI32, 32, 4);
         $uint_macro!(EvmCdU40, 40, 5);
         $int_macro!(EvmCdI40, 40, 5);
         $uint_macro!(EvmCdU48, 48, 6);
         $int_macro!(EvmCdI48, 48, 6);
         $uint_macro!(EvmCdU56, 56, 7);
         $int_macro!(EvmCdI56, 56, 7);
-        $uint_macro!(EvmCdU64, 64, 8);
-        $int_macro!(EvmCdI64, 64, 8);
         $uint_macro!(EvmCdU72, 72, 9);
         $int_macro!(EvmCdI72, 72, 9);
         $uint_macro!(EvmCdU80, 80, 10);
@@ -857,8 +894,6 @@ macro_rules! evm_cd_integer_range {
         $int_macro!(EvmCdI112, 112, 14);
         $uint_macro!(EvmCdU120, 120, 15);
         $int_macro!(EvmCdI120, 120, 15);
-        $uint_macro!(EvmCdU128, 128, 16);
-        $int_macro!(EvmCdI128, 128, 16);
         $uint_macro!(EvmCdU136, 136, 17);
         $int_macro!(EvmCdI136, 136, 17);
         $uint_macro!(EvmCdU144, 144, 18);

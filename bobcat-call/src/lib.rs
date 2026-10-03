@@ -59,7 +59,7 @@ macro_rules! generate_call_variants {
         paste::paste! {
             /// Call a contract with the given parameters. Returns a tuple of
             /// (success, return_data_length).
-            pub fn [<$base_fn _partial>](
+            fn [<$base_fn _partial>](
                 contract: Address,
                 calldata: &[u8],
                 $($value_param: $value_ty,)?

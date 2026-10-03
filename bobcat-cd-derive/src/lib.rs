@@ -635,8 +635,11 @@ fn evm_cd_integer_abi(name: &str) -> Option<(&'static str, usize)> {
         ("int", name.strip_prefix("EvmCdI")?)
     };
     let bits: usize = width.parse().ok()?;
-    ((8..=256).contains(&bits) && bits.is_multiple_of(8) && width == bits.to_string())
-        .then_some((prefix, bits))
+    ((8..=256).contains(&bits)
+        && bits.is_multiple_of(8)
+        && !matches!(bits, 8 | 16 | 32 | 64 | 128)
+        && width == bits.to_string())
+    .then_some((prefix, bits))
 }
 
 fn evm_cd_bytes_capacity(name: &str) -> Option<usize> {
@@ -661,6 +664,11 @@ fn static_abi_value_size(ty: &Type) -> Option<usize> {
                     | "u32"
                     | "u64"
                     | "u128"
+                    | "i8"
+                    | "i16"
+                    | "i32"
+                    | "i64"
+                    | "i128"
                     | "usize"
                     | "EvmCdAddress"
                     | "Address"
@@ -796,6 +804,11 @@ fn path_abi_type_name(path: &syn::Path) -> Option<Vec<u8>> {
         "u32" => Some(b"uint32".to_vec()),
         "u64" => Some(b"uint64".to_vec()),
         "u128" => Some(b"uint128".to_vec()),
+        "i8" => Some(b"int8".to_vec()),
+        "i16" => Some(b"int16".to_vec()),
+        "i32" => Some(b"int32".to_vec()),
+        "i64" => Some(b"int64".to_vec()),
+        "i128" => Some(b"int128".to_vec()),
         "usize" => Some(b"uint32".to_vec()),
         "EvmCdAddress" | "Address" => Some(b"address".to_vec()),
         "EvmCdString" => Some(b"string".to_vec()),
@@ -1326,14 +1339,30 @@ mod tests {
         assert_eq!(abi("u32"), "uint32");
         assert_eq!(abi("u64"), "uint64");
         assert_eq!(abi("u128"), "uint128");
+        assert_eq!(abi("i8"), "int8");
+        assert_eq!(abi("i16"), "int16");
+        assert_eq!(abi("i32"), "int32");
+        assert_eq!(abi("i64"), "int64");
+        assert_eq!(abi("i128"), "int128");
         assert_eq!(abi("usize"), "uint32");
         assert_eq!(abi("EvmCdAddress"), "address");
         assert_eq!(abi("Address"), "address");
-        for bits in (8..=256).step_by(8) {
+        for bits in (8..=256)
+            .step_by(8)
+            .filter(|bits| !matches!(bits, 8 | 16 | 32 | 64 | 128))
+        {
             assert_eq!(abi(&format!("EvmCdU{bits}")), format!("uint{bits}"));
             assert_eq!(
                 abi(&format!("bobcat_cd::EvmCdI{bits}")),
                 format!("int{bits}")
+            );
+        }
+        for bits in [8, 16, 32, 64, 128] {
+            assert!(
+                abi_type_name(&syn::parse_str::<Type>(&format!("EvmCdU{bits}")).unwrap()).is_none()
+            );
+            assert!(
+                abi_type_name(&syn::parse_str::<Type>(&format!("EvmCdI{bits}")).unwrap()).is_none()
             );
         }
         assert_eq!(abi("[u8; 4]"), "bytes4");

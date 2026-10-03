@@ -9,6 +9,7 @@ use bobcat_cd::{
 enum Call {
     Store(EvmCdAddress, EvmCdArray<u16, 0, 3>),
     SetCount(usize),
+    SetSigned(i16),
     SetEnabled(bool),
 }
 
@@ -149,6 +150,29 @@ fn usize_uses_uint32_abi_encoding() {
                 .is_err()
         );
     }
+}
+
+#[test]
+fn signed_rust_integers_use_canonical_abi_encoding() {
+    for value in [i16::MIN, -2, 0, 1, i16::MAX] {
+        let call = Call::SetSigned(value);
+        let mut encoded = Vec::new();
+        call.serialise(&mut encoded).unwrap();
+
+        assert_eq!(&encoded[..4], &const_keccak_sel(b"setSigned(int16)"));
+        let extension = if value.is_negative() { 0xff } else { 0 };
+        assert!(encoded[4..34].iter().all(|byte| *byte == extension));
+        assert_eq!(&encoded[34..], &value.to_be_bytes());
+        assert_eq!(
+            Call::deserialise_reader(&mut encoded.as_slice()).unwrap(),
+            call
+        );
+    }
+
+    let mut noncanonical = [0u8; 32];
+    noncanonical[0] = 0xff;
+    noncanonical[30..].copy_from_slice(&1i16.to_be_bytes());
+    assert!(i16::deserialise_reader(&mut noncanonical.as_slice()).is_err());
 }
 
 #[test]
