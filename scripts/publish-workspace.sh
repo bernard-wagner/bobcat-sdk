@@ -46,7 +46,9 @@ dependencies = {
     name: {
         dependency["name"]
         for dependency in package["dependencies"]
-        if dependency.get("path") is not None and dependency["name"] in workspace
+        if dependency.get("path") is not None
+        and dependency["name"] in workspace
+        and dependency["kind"] != "dev"
     }
     for name, package in workspace.items()
 }
