@@ -1263,7 +1263,7 @@ impl U {
     }
 
     pub fn wrapping_ceil_div(&self, y: &Self) -> Self {
-        if y.is_zero() {
+        if self.is_zero() || y.is_zero() {
             return U::ZERO;
         }
         self.wrapping_sub(&U::ONE)
@@ -1272,7 +1272,7 @@ impl U {
     }
 
     pub fn checked_ceil_div(&self, y: &Self) -> Self {
-        if y.is_zero() {
+        if self.is_zero() || y.is_zero() {
             return U::ZERO;
         }
         let v = panic_on_err_overflow!(
@@ -1292,7 +1292,7 @@ impl U {
     }
 
     pub fn checked_ceil_div_opt(&self, y: &Self) -> Option<Self> {
-        if y.is_zero() {
+        if self.is_zero() || y.is_zero() {
             return Some(U::ZERO);
         }
         self.checked_sub_opt(&U::ONE)?
