@@ -185,6 +185,14 @@ pub fn keccak256(b: &[u8]) -> U {
     U(out)
 }
 
+pub fn keccak256commutative_hash_pair(mut x: U, mut y: U) -> U {
+    if x > y {
+        (y, x) = (x, y);
+    }
+    let pre: [u8; 32 * 2] = concat_arrays!(x.0, y.0);
+    keccak256(&pre)
+}
+
 pub const fn const_keccak256(b: &[u8]) -> U {
     U(Keccak256::new().update(b).finalize())
 }
