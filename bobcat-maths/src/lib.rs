@@ -281,8 +281,13 @@ fn wrapping_div_quo_rem_b<const C: usize>(x: &[u8; C], denom: &[u8; C]) -> ([u8;
     (q, r)
 }
 
-pub fn const_wrapping_div(x: &U, y: &U) -> U {
+pub fn wrapping_div_const(x: &U, y: &U) -> U {
     U(wrapping_div_quo_rem_b::<32>(&x.0, &y.0).0)
+}
+
+#[deprecated = "Use wrapping_div_const instead"]
+pub fn const_wrapping_div(x: &U, y: &U) -> U {
+    wrapping_div_const(x, y)
 }
 
 #[cfg_attr(test, mutants::skip)]
