@@ -1,0 +1,38 @@
+rules:
+  - id: bobcat-no-manual-evm-cd-serialise
+    languages: [rust]
+    severity: ERROR
+    message: >-
+      Do not implement EvmCdSerialise manually. Derive EvmCdSerialise and use the
+      shared bobcat-cd ABI wrappers instead.
+    metadata:
+      audience: llms
+      category: maintainability
+      technology: [rust, bobcat-cd]
+    paths:
+      exclude:
+        - /bobcat-cd/src/serialisation.rs
+    patterns:
+      - pattern-inside: |
+          impl $TRAIT for $TYPE { ... }
+      - pattern-regex: >-
+          (?ms)^[ \t]*impl(?:\s*<[^;{}]*>)?\s+(?:[A-Za-z_][A-Za-z0-9_]*::)*EvmCdSerialise\s+for\b
+
+  - id: bobcat-no-manual-evm-cd-deserialise
+    languages: [rust]
+    severity: ERROR
+    message: >-
+      Do not implement EvmCdDeserialise manually. Derive EvmCdDeserialise and use
+      the shared bobcat-cd ABI wrappers instead.
+    metadata:
+      audience: llms
+      category: maintainability
+      technology: [rust, bobcat-cd]
+    paths:
+      exclude:
+        - /bobcat-cd/src/serialisation.rs
+    patterns:
+      - pattern-inside: |
+          impl $TRAIT for $TYPE { ... }
+      - pattern-regex: >-
+          (?ms)^[ \t]*impl(?:\s*<[^;{}]*>)?\s+(?:[A-Za-z_][A-Za-z0-9_]*::)*EvmCdDeserialise\s+for\b
