@@ -36,3 +36,24 @@ rules:
           impl $TRAIT for $TYPE { ... }
       - pattern-regex: >-
           (?ms)^[ \t]*impl(?:\s*<[^;{}]*>)?\s+(?:[A-Za-z_][A-Za-z0-9_]*::)*EvmCdDeserialise\s+for\b
+
+  - id: bobcat-use-bobcat-units-constants
+    languages: [rust]
+    severity: ERROR
+    message: >-
+      Do not redefine standard U unit or duration constants. Import the matching
+      constant from bobcat-units instead (for example, bobcat_units::{WAD,
+      TWO_WAD, YEAR}).
+    metadata:
+      audience: llms
+      category: maintainability
+      technology: [rust, bobcat-units]
+    paths:
+      exclude:
+        - /bobcat-units/src/lib.rs
+    patterns:
+      - pattern: |
+          const $UNIT: U = $VALUE;
+      - metavariable-regex:
+          metavariable: $UNIT
+          regex: '^(?:NOETHER|WEI|KWEI|MWEI|GWEI|MICROETHER|MILLIETHER|ETHER|KETHER|METHER|GETHER|TETHER|BABBAGE|FEMTOETHER|LOVELACE|PICOETHER|SHANNON|NANOETHER|NANO|SZABO|MICRO|FINNEY|MILLI|GRAND|WAD|TWO_WAD|HOUR|DAY|WEEK|MONTH|YEAR)$'

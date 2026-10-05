@@ -6,7 +6,6 @@ rules:
       Do not compare U with U::ZERO. Use value.is_zero() instead; it is clearer
       and uses U's dedicated zero test.
     metadata:
-      audience: human-programmers
       category: idiom
       technology: [rust, bobcat-maths]
     pattern-either:
@@ -22,7 +21,6 @@ rules:
       Do not compare U with U::ZERO. Use value.is_some() instead; it is clearer
       and uses U's dedicated nonzero test.
     metadata:
-      audience: human-programmers
       category: idiom
       technology: [rust, bobcat-maths]
     pattern-either:
