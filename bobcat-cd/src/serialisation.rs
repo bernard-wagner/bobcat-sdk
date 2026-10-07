@@ -361,7 +361,7 @@ impl<S> AsMut<[u8]> for EvmCdBuffer<S> {
 
 #[cfg(feature = "alloc")]
 #[doc(hidden)]
-pub struct EvmCdDynamicBuffer<S>(Vec<u8>, core::marker::PhantomData<S>);
+pub struct EvmCdDynamicBuffer<S>(pub Vec<u8>, pub core::marker::PhantomData<S>);
 
 #[cfg(feature = "alloc")]
 impl<S> EvmCdDecodeBuffer for EvmCdDynamicBuffer<S> {
@@ -690,7 +690,7 @@ impl EvmCdDeserialise for usize {
 macro_rules! evm_cd_uint {
     ($name:ident, $bits:literal, $bytes:literal) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $name([u8; $bytes]);
+        pub struct $name(pub [u8; $bytes]);
 
         impl $name {
             pub const fn new(bytes: [u8; $bytes]) -> Self {
@@ -778,7 +778,7 @@ macro_rules! evm_cd_uint {
 macro_rules! evm_cd_int {
     ($name:ident, $bits:literal, $bytes:literal) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-        pub struct $name([u8; $bytes]);
+        pub struct $name(pub [u8; $bytes]);
 
         impl $name {
             pub const fn new(bytes: [u8; $bytes]) -> Self {
@@ -932,7 +932,7 @@ macro_rules! evm_cd_integer_range {
 evm_cd_integer_range!(evm_cd_uint, evm_cd_int);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct EvmCdAddress([u8; 20]);
+pub struct EvmCdAddress(pub [u8; 20]);
 
 impl EvmCdAddress {
     pub const fn new(bytes: [u8; 20]) -> Self {
@@ -1356,8 +1356,8 @@ pub enum EvmCdBytesError {
 
 #[derive(Clone)]
 pub struct EvmCdBytes<const CAP: usize> {
-    len: usize,
-    bytes: [u8; CAP],
+    pub len: usize,
+    pub bytes: [u8; CAP],
 }
 
 impl<const CAP: usize> EvmCdBytes<CAP> {
@@ -1487,7 +1487,7 @@ impl<const CAP: usize> core::hash::Hash for EvmCdBytes<CAP> {
 
 #[doc(hidden)]
 pub struct EvmCdBytesWriter<'a, const CAP: usize> {
-    bytes: &'a mut EvmCdBytes<CAP>,
+    pub bytes: &'a mut EvmCdBytes<CAP>,
 }
 
 #[cfg(not(feature = "std"))]
@@ -1610,8 +1610,8 @@ pub enum EvmCdStringError {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EvmCdString<const MIN: usize, const CAP: usize> {
-    len: usize,
-    bytes: [u8; CAP],
+    pub len: usize,
+    pub bytes: [u8; CAP],
 }
 
 impl<const MIN: usize, const CAP: usize> EvmCdString<MIN, CAP> {
