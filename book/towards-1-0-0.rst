@@ -4,10 +4,16 @@ Towards 1.0.0
 """""""""""""
 
 Superposition is evolving Bobcat-sdk from a Superposition-only internal project to
-something for everyone, with a book (and examples for every mainstream interface), a
-derived capabilities-based storage macro, a stack-free overhauled calling interface,
-on-chain verification, generation of Solidity code from the entrypoint types, lots of
-documentation, always using tickmath on non wasm32 hosts, and an easy getting started url.
+something for everyone, with:
+
+- A book!
+- A derived capabilities macro for storage.
+- A stack-free call macro that unifies each of the calling functions, taking structures.
+- On-chain verification.
+- Generation of Solidity code from the entrypoint type and vice versa.
+- A TON of documentation.
+- Always using Alloy for the local host.
+- An easy getting started url.
 
 What is Bobcat-sdk?
 -------------------
