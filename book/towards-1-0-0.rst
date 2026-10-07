@@ -9,6 +9,7 @@ something for everyone, with:
 - A book!
 - A derived capabilities macro for storage.
 - A stack-free call macro that unifies each of the calling functions, taking structures.
+- Unified return macros and optional decorators for an entrypoint function that lets you run your contract as a binary with no return.
 - On-chain verification.
 - Generation of Solidity code from the entrypoint type and vice versa.
 - A TON of documentation.
@@ -23,13 +24,7 @@ several features over the existing SDK:
 
 1. Full traces on-chain from a panic macro.
 
-2. Interfaces built into the interface for
-
-```rust
-pub struct Entry {
-    Hello,
-}
-```
+(WIP)
 
 History of Bobcat-sdk
 ---------------------
