@@ -32,4 +32,5 @@ html_theme_options = {
     'logo_name': True,
     'github_user': 'stylus-developers-guild',
     'github_repo': 'bobcat-sdk',
+    'github_type': 'star',
 }

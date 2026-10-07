@@ -8,6 +8,7 @@ something for everyone, with:
 
 - A book!
 - A derived capabilities macro for storage.
+- Reimplementing the derived macro for cd to simplify it. Also making sure it's pattern matching compatible.
 - A stack-free call macro that unifies each of the calling functions, taking structures.
 - Unified return macros and optional decorators for an entrypoint function that lets you run your contract as a binary with no return.
 - On-chain verification.
