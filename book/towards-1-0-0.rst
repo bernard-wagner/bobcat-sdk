@@ -6,8 +6,8 @@ Towards 1.0.0
 Superposition is evolving Bobcat-sdk from a Superposition-only internal project to
 something for everyone, with a book (and examples for every mainstream interface), a
 derived capabilities-based storage macro, a stack-free overhauled calling interface,
-on-chain verification, generation of Solidity code from the entrypoint types, and an easy
-getting started url.
+on-chain verification, generation of Solidity code from the entrypoint types, lots of
+documentation, and an easy getting started url.
 
 What is Bobcat-sdk?
 -------------------

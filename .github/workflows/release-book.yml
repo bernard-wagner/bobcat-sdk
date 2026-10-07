@@ -1,26 +1,26 @@
 name: Release book
 
-# Rebuild the compiled Sphinx HTML and publish it to the release-book branch
-# whenever a BobcatRelease branch is pushed (branch creation is the first push).
-# The release-book branch is excluded so this doesn't loop on its own output.
+# Rebuild the compiled Sphinx HTML and deploy it with GitHub Pages whenever a
+# BobcatRelease branch is pushed (branch creation is the first push).
 
 on:
   push:
     branches:
       - 'release-*'
-      - '!release-book'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: release-book
+  group: pages
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build book and publish to release-book
+    name: Build book
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -36,15 +36,28 @@ jobs:
       - name: Install Sphinx
         run: pip install sphinx
 
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+
       - name: Build HTML
         run: make html
         working-directory: book
 
-      - name: Publish to release-book
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: book/_build/html
-          publish_branch: release-book
-          user_name: 'github-actions[bot]'
-          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          path: book/_build/html
+
+  deploy:
+    name: Deploy book to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
