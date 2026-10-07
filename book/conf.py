@@ -25,3 +25,11 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'alabaster'
 html_static_path = ['_static']
+html_logo = '../logo.svg'
+pygments_style = 'monokai'
+html_theme_options = {
+    'description': 'A Rust SDK for Arbitrum Stylus',
+    'logo_name': True,
+    'github_user': 'stylus-developers-guild',
+    'github_repo': 'bobcat-sdk',
+}
