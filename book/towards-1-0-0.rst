@@ -15,6 +15,7 @@ something for everyone, with:
 - Generation of Solidity code from the entrypoint type and vice versa.
 - A TON of documentation.
 - Always using Alloy for the local host.
+- Making several functions private that we don't imagine see use.
 - An easy getting started url.
 
 What is Bobcat-sdk?
