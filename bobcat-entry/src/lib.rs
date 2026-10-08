@@ -353,6 +353,18 @@ pub unsafe fn storage_flush_cache(clear: bool) {
     unsafe { host::storage_flush_cache(clear) }
 }
 
+/// Check if the contract interaction is reentrant.
+pub fn msg_reentrant() -> bool {
+    unsafe { host::msg_reentrant() }
+}
+
+/// Guard the function given, reverting if the contract call is reentrant,
+/// using the msg.reentrant message instead of transient storage.
+pub fn reentrancy_guard<R, F: FnOnce() -> R>(f: F) -> R {
+    assert!(!msg_reentrant(), "reentrancy is not allowed");
+    f()
+}
+
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;

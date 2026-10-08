@@ -587,3 +587,7 @@ unsafe extern "C" {
 pub unsafe fn exit_early(_: i32) -> ! {
     todo!("implement dispatch function");
 }
+
+pub unsafe fn msg_reentrant() -> bool {
+    false
+}

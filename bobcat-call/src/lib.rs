@@ -381,6 +381,32 @@ macro_rules! generate_call_variants {
                 (rc, b)
             }
 
+            /// Call a contract, bounding successful returndata while preserving
+            /// the complete revert payload for callers that need to bubble it.
+            #[cfg(feature = "alloc")]
+            pub fn [<$base_fn _slice_or_revert_vec>]<const DATA_CAP: usize>(
+                contract: Address,
+                calldata: &[u8],
+                $($value_param: $value_ty,)?
+                gas: u64,
+                offset: usize,
+            ) -> Result<(usize, [u8; DATA_CAP]), Vec<u8>> {
+                let (rc, rd_len) = [<$base_fn _partial>](contract, calldata, $($value_param,)? gas);
+                panic_on_err_bad_decoding_bool!(
+                    rd_len >= offset;
+                    "offset greater than rd len ok, offset: {offset}, rd len: {rd_len}, contract: {contract:?}, calldata: {calldata:?}"
+                );
+                let size = rd_len - offset;
+                if rc {
+                    let mut data = [0u8; DATA_CAP];
+                    let read_len = core::cmp::min(DATA_CAP, size);
+                    unsafe { host::read_return_data(data.as_mut_ptr(), offset, read_len) };
+                    Ok((size, data))
+                } else {
+                    Err(read_return_data_vec(offset, size))
+                }
+            }
+
             /// Same as the other vec function, returning Option if error.
             #[cfg(feature = "alloc")]
             pub fn [<$base_fn _vec_opt>](

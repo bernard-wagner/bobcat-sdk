@@ -37,11 +37,6 @@ This is a zero allocation example coming in at 8k:
 
 use bobcat_sdk::prelude::*;
 
-#[link(wasm_import_module = "vm_hooks")]
-unsafe extern "C" {
-    fn msg_reentrant() -> bool;
-}
-
 #[derive(Debug, Clone, EvmCdSerialise, EvmCdDeserialise)]
 #[evm_selector]
 pub enum Entry {

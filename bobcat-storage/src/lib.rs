@@ -143,27 +143,6 @@ pub fn slot_map_slot(k: &U, p: &U) -> U {
     const_slot_map(k, p)
 }
 
-pub fn reentrancy_guard_entry(x: &U) {
-    assert!(x.len() <= 32, "too large");
-    assert!(transient_exchange(x, &U::ZERO, &U::ONE), "reentrancy alarm")
-}
-
-pub fn reentrancy_guard_exit(x: &U) {
-    assert!(x.len() <= 32, "too large");
-    transient_store(x, &U::ZERO);
-}
-
-pub fn reentrancy_guard<R>(k: &U, f: impl FnOnce() -> R) -> R {
-    reentrancy_guard_entry(k);
-    let v = f();
-    reentrancy_guard_exit(k);
-    v
-}
-
-pub fn reentrancy_guard_sel<R>(k: &[u8; 4], f: impl FnOnce() -> R) -> R {
-    reentrancy_guard::<R>(&U::from(k), f)
-}
-
 /// Compute the slot for a slice, and take it off the curve. Useful for
 /// storage slot accesses (and more).
 pub const fn const_slot_off_curve(b: &[u8]) -> U {
@@ -223,14 +202,6 @@ pub fn keccak256(b: &[u8]) -> U {
     const_keccak256(b)
 }
 
-pub fn reentrancy_guard_const_keccak<R>(k: &[u8], f: impl FnOnce() -> R) -> R {
-    reentrancy_guard(&const_keccak256(k), f)
-}
-
-pub fn reentrancy_guard_keccak<R>(k: &[u8], f: impl FnOnce() -> R) -> R {
-    reentrancy_guard(&keccak256(k), f)
-}
-
 /// Find the storage map slot using keccak_const. Don't do this during
 /// your runtime code, unless you want to pay the codesize price.
 /// Make sure to reverse your arguments if you're shooting for EVM
@@ -264,38 +235,4 @@ fn test_slot_edd25519_count() {
         ),
         const_slot_off_curve(b"superposition.passport.ed25519_count")
     );
-}
-
-#[cfg(all(feature = "std", test))]
-mod test {
-    use super::*;
-
-    use proptest::prelude::*;
-
-    proptest! {
-        #[test]
-        fn test_reentrancy_guard(x in any::<[u8; 8]>()) {
-            reentrancy_guard(&U::from(x), || {
-                assert!(transient_load(&U::from(x)).is_true());
-            });
-            assert!(transient_load(&U::from(x)).is_zero());
-        }
-
-        #[test]
-        fn test_reentrancy_guard_bad(x in any::<[u8; 8]>()) {
-             let x = U::from(x);
-             transient_store(&x, &U::from(false));
-             assert!(transient_exchange(&x, &U::ZERO, &U::ONE));
-             assert!(!transient_exchange(&x, &U::ZERO, &U::ONE));
-            assert!(transient_load(&x).is_some());
-        }
-
-        #[test]
-        fn test_reentrancy_guard_sel(x in any::<[u8; 4]>()) {
-            reentrancy_guard_sel(&x, || {
-                assert!(transient_load(&U::from(x)).is_true());
-            });
-            assert!(transient_load(&U::from(x)).is_zero());
-        }
-    }
 }

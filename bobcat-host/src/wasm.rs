@@ -74,4 +74,5 @@ unsafe extern "C" {
     pub fn block_basefee(out: *mut u8);
     pub fn evm_gas_left() -> u64;
     pub fn evm_ink_left() -> u64;
+    pub fn msg_reentrant() -> bool;
 }

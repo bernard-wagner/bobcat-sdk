@@ -101,3 +101,7 @@ pub unsafe fn evm_ink_left() -> u64 {
 pub unsafe fn exit_early(code: i32) -> ! {
     panic!("exit_early called: {code}");
 }
+
+pub unsafe fn msg_reentrant() -> bool {
+    false
+}

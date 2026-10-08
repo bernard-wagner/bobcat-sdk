@@ -16,6 +16,7 @@ something for everyone, with:
 - A TON of documentation.
 - Always using Alloy for the local host.
 - Making several functions private that we don't imagine see use.
+- Removing the reentrancy guard functions. These were added for cases with mixed backend execution of code, but we haven't made proper use of these and think their existence is confusing. The interaction with the storage cache is also dangerous.
 - An easy getting started url.
 
 What is Bobcat-sdk?

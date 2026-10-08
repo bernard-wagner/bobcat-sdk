@@ -57,7 +57,7 @@ macro_rules! storage {
         pub fn decr($param1: impl Into<U>) {
             let k = slot_map(&$param1.into(), &SLOT);
             let v = storage_load(&k);
-            storage_store(&k, &(v + U::ONE))
+            storage_store(&k, &(v - U::ONE))
         }
 
         #[allow(unused)]
