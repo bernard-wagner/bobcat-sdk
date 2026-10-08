@@ -18,7 +18,12 @@ Note that stylus-sdk accidentally bundles the std with its built code.
 | Muldiv    | 21623              | 7201        | A muldiv implementation, compared to the version in 9lives.    |
 | Camelot   | 40940              | 4626        | Acts as an intermediary for Camelot swapping using its router. |
 | Bozo      | N/A                | 26320       | The contract code powering a dumb app for bidding on things.   |
-| Supercats | 89413              | 18927       | NFT contract code for Superposition Supercats on Arbitrum One. |
+
+
+|    Name   | stylus-sdk (0.9.0) | bobcat-sdk |                          Description                           |
+|-----------|--------------------|------------|----------------------------------------------------------------|
+| Supercats | 89413              | 18927      | NFT contract code for Superposition Supercats on Arbitrum One. |
 
 The Supercats example reference is a copy and paste from the OpenZeppelin NFT wizard. The
-code was compiled with `cargo stylus build`.
+code was compiled with `cargo stylus build`. The OZ SDK for this only supports Stylus
+0.9.0 (that I'm aware of.)
