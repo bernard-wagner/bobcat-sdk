@@ -4,7 +4,7 @@ version = "0.1.11"
 edition = "2024"
 
 [dependencies]
-bobcat-entrypoints = "0.1.4"
+bobcat-entrypoints = { version = ">=0.1.5", default-features = false }
 bobcat-sdk = { workspace = true, features = ["panic"] }
 const-hex = { version = "1.19.3", default-features = false }
 

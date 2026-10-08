@@ -3,9 +3,9 @@
 
 use bobcat_sdk::prelude::*;
 
-use bobcat_entrypoints::Eip721DataSlice;
+use bobcat_entrypoints::Eip721MetadataDataSlice;
 
-type Entry = Eip721DataSlice<1000>;
+type Entry = Eip721MetadataDataSlice<1000>;
 
 use const_hex::display as hex_display;
 
@@ -119,6 +119,12 @@ const CAP: usize = 1000;
 #[unsafe(no_mangle)]
 fn user_entrypoint(len: usize) -> usize {
     match read_cd::<Entry>(len) {
+        Entry::Name => {
+            write_str("Superposition Supercats")
+        }
+        Entry::Symbol => {
+            write_str("SPN CATS")
+        }
         Entry::BalanceOf { owner } => {
             assert_ne!([0u8; 20], owner.0, "owner zero address");
             write_word(&storage::balance::get(&owner.into_array()))

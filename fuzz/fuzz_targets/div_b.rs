@@ -28,5 +28,5 @@ fuzz_target!(|data: Div| {
     if y.is_zero() {
         return
     }
-    assert_eq_t!(ex.wrapping_div(ey), &const_wrapping_div(&x, &y),);
+    assert_eq_t!(ex.wrapping_div(ey), &wrapping_div_const(&x, &y),);
 });

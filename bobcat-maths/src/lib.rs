@@ -1138,6 +1138,62 @@ impl U {
         Some(U(b))
     }
 
+    pub const fn str_slice_buf(&self, res: &mut [u8; 78]) -> usize {
+        if self.is_zero() {
+            res[0] = b'0';
+            return 1;
+        }
+        let mut i = 0;
+        let mut b = 0;
+        while b < 32 {
+            let mut carry = self.0[b] as u32;
+            let mut j = 0;
+            while j < i {
+                let temp = (res[j] as u32) * 256 + carry;
+                res[j] = (temp % 10) as u8;
+                carry = temp / 10;
+                j += 1;
+            }
+            while carry > 0 {
+                res[i] = (carry % 10) as u8;
+                i += 1;
+                carry /= 10;
+            }
+            b += 1;
+        }
+        let mut j = 0;
+        while j < i / 2 {
+            let temp = res[j];
+            res[j] = res[i - 1 - j];
+            res[i - 1 - j] = temp;
+            j += 1;
+        }
+        j = 0;
+        while j < i {
+            res[j] += b'0';
+            j += 1;
+        }
+        i
+    }
+
+    pub const fn str<'a>(&'a self, result: &'a mut [u8; 78]) -> &'a str {
+        let i = self.str_slice_buf(result);
+        unsafe {
+            core::str::from_utf8_unchecked(
+                core::slice::from_raw_parts(result.as_ptr(), i)
+            )
+        }
+    }
+
+    /// Get a slice that can be converted to utf8 with
+    /// `core::str::from_utf8_unchecked`. Returns the slice and the
+    /// length that was written.
+    pub const fn str_slice(&self) -> ([u8; 78], usize) {
+        let mut buf = [0u8; 78];
+        let i = self.str_slice_buf(&mut buf);
+        (buf, i)
+    }
+
     pub fn addr(self) -> [u8; 20] {
         self.into()
     }
@@ -1332,29 +1388,8 @@ impl U {
 
 impl Display for U {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        if self.is_zero() {
-            return write!(f, "0");
-        }
-        let mut result = [0u8; 78];
-        let mut i = 0;
-        for byte in self.0 {
-            let mut carry = byte as u32;
-            for digit in result[..i].iter_mut() {
-                let temp = (*digit as u32) * 256 + carry;
-                *digit = (temp % 10) as u8;
-                carry = temp / 10;
-            }
-            while carry > 0 {
-                result[i] = (carry % 10) as u8;
-                i += 1;
-                debug_assert!(78 >= i, "{} > {i}", result.len());
-                carry /= 10;
-            }
-        }
-        for &digit in result[..i].iter().rev() {
-            write!(f, "{}", digit)?;
-        }
-        Ok(())
+        let mut buf = [0u8; 78];
+        write!(f, "{}", self.str(&mut buf))
     }
 }
 
@@ -1840,7 +1875,7 @@ mod test {
             let numerator_u = U::from(numerator);
             let denominator_u = U::from(denominator);
             prop_assert_eq!(
-                const_wrapping_div(&numerator_u, &denominator_u).0,
+                wrapping_div_const(&numerator_u, &denominator_u).0,
                 wrapping_div_quo_rem_b::<32>(&numerator, &denominator).0
             );
         }
