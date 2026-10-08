@@ -3,17 +3,16 @@
 
 use bobcat_sdk::prelude::*;
 
+bobcat_allocator!();
+
 type Entry = Eip721MetadataDataSlice<1000>;
 
 use const_hex::display as hex_display;
 
-mod storage;
 mod entry;
+mod storage;
 
 use entry::Eip721MetadataDataSlice;
-
-#[global_allocator]
-static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
 const CDN_URI_CATS: &'static str = "https://cats-cdn.superposition.so/";
 
@@ -51,14 +50,6 @@ fn transfer_from(from: [u8; 20], to: [u8; 20], token_id: U) -> [u8; 20] {
 }
 
 const ERC721_CB_SEL: [u8; 4] = const_keccak_sel(b"onERC721Received(address,address,uint256,bytes)");
-const NON_ERC721_RECIPIENT: [u8; 4] = [0xd1, 0xa5, 0x7e, 0xd6];
-
-fn revert_with(data: &[u8]) -> ! {
-    unsafe {
-        host::write_result(data.as_ptr(), data.len());
-        host::exit_early(1)
-    }
-}
 
 #[derive(Debug, Clone, EvmCdSerialise)]
 #[evm_selector]
@@ -81,7 +72,7 @@ fn safe_transfer<const DATA_CAP: usize>(
 ) {
     let sender = transfer_from(from, to, token_id);
     if addr_has_code(to) {
-        let result = call_slice_or_revert_vec::<32>(
+        let (rc, _, rd) = call_slice::<4>(
             to,
             &Erc721Cb::OnErc721Received {
                 operator: EvmCdAddress::new(sender),
@@ -98,20 +89,8 @@ fn safe_transfer<const DATA_CAP: usize>(
             u64::MAX,
             0,
         );
-        let (result_len, result) = match result {
-            Ok(result) => result,
-            Err(revert_data) => {
-                if revert_data.is_empty() {
-                    revert_with(&NON_ERC721_RECIPIENT);
-                }
-                revert_with(&revert_data);
-            }
-        };
-        let mut expected = [0u8; 32];
-        expected[..4].copy_from_slice(&ERC721_CB_SEL);
-        if result_len < expected.len() || result != expected {
-            revert_with(&NON_ERC721_RECIPIENT);
-        }
+        assert!(rc, "callback failed");
+        assert_eq!(ERC721_CB_SEL, rd, "selector not equal");
     }
 }
 
@@ -144,12 +123,11 @@ const DATA_CAP: usize = 1000;
 
 #[unsafe(no_mangle)]
 fn user_entrypoint(len: usize) -> usize {
-    reentrancy_guard(||
-    match read_cd::<Entry>(len) {
-        Entry::Mint { owner, token_id } => {
+    reentrancy_guard(|| match read_cd::<Entry>(len) {
+        Entry::Mint { owner, token_id } => flush_guard(|| {
             storage::balance::incr(owner);
-            storage::owner_of::set(token_id, owner)
-        }
+            storage::owner_of::set(token_id, owner);
+        }),
         Entry::Name => write_str("Superposition Supercats"),
         Entry::Symbol => write_str("SPN CATS"),
         Entry::TokenUri { token_id } => {

@@ -3,13 +3,13 @@
 
 use bobcat_sdk::prelude::*;
 
-use bobcat_entrypoints::Eip721MetadataDataSlice;
-
 type Entry = Eip721MetadataDataSlice<1000>;
 
 use const_hex::display as hex_display;
 
 mod storage;
+
+use bobcat_entrypoints::Eip721MetadataDataSlice;
 
 const CDN_URI_CATS: &'static str = "https://cats-cdn.superposition.so/";
 
@@ -69,7 +69,7 @@ fn safe_transfer<const DATA_CAP: usize>(
 ) {
     let sender = transfer_from(from, to, token_id);
     if addr_has_code(to) {
-        let (rc, _, sel) = call_slice::<4>(
+        let (rc, _, rd) = call_slice::<4>(
             to,
             &Erc721Cb::OnErc721Received {
                 operator: EvmCdAddress::new(sender),
@@ -80,25 +80,20 @@ fn safe_transfer<const DATA_CAP: usize>(
                     bytes: data,
                 },
             }
-            .to_evm_array::<DATA_CAP>().unwrap(),
+            .to_evm_array::<DATA_CAP>()
+            .unwrap(),
             &U::ZERO,
             u64::MAX,
             0,
         );
-        assert!(rc, "selector callback failed");
-        assert_eq!(
-            ERC721_CB_SEL,
-            sel,
-            "returned selector not correct for callback: {}",
-            hex_display(sel)
-        );
+        assert!(rc, "callback failed");
+        assert_eq!(ERC721_CB_SEL, rd, "selector not equal");
     }
 }
 
 fn approve(spender: [u8; 20], id: U) {
     let owner = storage::owner_of::get(id).addr();
     let sender = msg_sender();
-    assert_ne!(spender, owner, "cannot approve self");
     if sender != owner {
         assert!(
             storage::approved_for_all::get(owner, sender).is_some(),
@@ -111,30 +106,40 @@ fn approve(spender: [u8; 20], id: U) {
 
 fn set_approval_for_all(operator: [u8; 20], approved: bool) {
     let sender = msg_sender();
-    assert_ne!(sender, operator, "cannot approval all self");
     storage::approved_for_all::set(sender, operator, approved);
-    emit!(TOPIC_APPROVAL_FOR_ALL, sender, operator, approved);
+    emit!(
+        TOPIC_APPROVAL_FOR_ALL,
+        sender,
+        operator,
+        data: U::from(approved),
+        32
+    );
 }
 
-const CAP: usize = 1000;
+const DATA_CAP: usize = 1000;
 
 #[unsafe(no_mangle)]
 fn user_entrypoint(len: usize) -> usize {
+    reentrancy_guard(||
     match read_cd::<Entry>(len) {
-        Entry::Name => {
-            write_str("Superposition Supercats")
-        }
-        Entry::Symbol => {
-            write_str("SPN CATS")
-        }
+        Entry::Name => write_str("Superposition Supercats"),
+        Entry::Symbol => write_str("SPN CATS"),
         Entry::TokenUri { token_id } => {
-           const URI_LEN: usize = 34;
-           const TOKEN_URI_LEN: usize = URI_LEN + size_of::<U>();
-           let mut buf = [0u8; TOKEN_URI_LEN];
-           buf.copy_from_slice(CDN_URI_CATS.as_bytes());
-           let token_str_len = token_id.str_slice_buf(&mut buf[URI_LEN..].try_into().unwrap());
-           let len = URI_LEN + token_str_len;
-           write_array_slice_len::<TOKEN_URI_LEN, {TOKEN_URI_LEN + 32 * 2}>(buf, len)
+            const URI_LEN: usize = 34;
+            const TOKEN_ID_LEN: usize = 78;
+            const TOKEN_URI_CAP: usize = URI_LEN + TOKEN_ID_LEN;
+            assert_ne!(
+                [0u8; 20],
+                storage::owner_of::get(token_id).addr(),
+                "{token_id} not minted"
+            );
+            let mut buf = [0u8; TOKEN_URI_CAP];
+            buf[..URI_LEN].copy_from_slice(CDN_URI_CATS.as_bytes());
+            let (token_str, token_str_len) = token_id.str_slice();
+            buf[URI_LEN..URI_LEN + token_str_len].copy_from_slice(&token_str[..token_str_len]);
+            let len = URI_LEN + token_str_len;
+            let uri = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
+            write_str(uri)
         }
         Entry::BalanceOf { owner } => {
             assert_ne!([0u8; 20], owner.0, "owner zero address");
@@ -145,12 +150,19 @@ fn user_entrypoint(len: usize) -> usize {
             assert_ne!([0u8; 20], owner.addr(), "{token_id} not minted");
             write_word(&owner)
         }
-        Entry::GetApproved { token_id } => write_word(&storage::approval::get(token_id)),
+        Entry::GetApproved { token_id } => {
+            assert_ne!(
+                [0u8; 20],
+                storage::owner_of::get(token_id).addr(),
+                "{token_id} not minted"
+            );
+            write_word(&storage::approval::get(token_id))
+        }
         Entry::IsApprovedForAll { owner, operator } => {
             write_word(&storage::approved_for_all::get(owner.0, operator.0))
         }
         Entry::SafeTransferFrom { from, to, token_id } => {
-            flush_guard(|| safe_transfer(from.into(), to.into(), token_id, [0u8; CAP], 0))
+            flush_guard(|| safe_transfer(from.into(), to.into(), token_id, [0u8; DATA_CAP], 0))
         }
         Entry::SafeTransferFromWithData {
             from,
@@ -165,6 +177,6 @@ fn user_entrypoint(len: usize) -> usize {
         Entry::SetApprovalForAll { operator, approved } => {
             flush_guard(|| set_approval_for_all(operator.into(), approved))
         }
-    };
+    });
     0
 }
