@@ -1,6 +1,6 @@
 use bobcat_cd::serialisation::SelectorHasher;
 use bobcat_cd::{
-    EvmCdAddress, EvmCdArray, EvmCdArrayError, EvmCdDeserialise, EvmCdSerialise, EvmCdString,
+    EvmCdAddress, EvmCdArray, EvmCdArrayError, EvmCdDeserialise, EvmCdSerialise, EvmCdString, U,
     const_keccak_sel,
 };
 
@@ -24,6 +24,19 @@ fn serialises_directly_into_a_mut_vec() {
     assert_eq!(encoded[0], 0xff, "serialisation appends to the vector");
     assert!(encoded[1..31].iter().all(|byte| *byte == 0));
     assert_eq!(&encoded[31..], &[0x12, 0x34]);
+}
+
+#[test]
+fn address_converts_into_a_left_padded_u() {
+    let mut bytes = [0u8; 20];
+    bytes[0] = 0x12;
+    bytes[19] = 0x34;
+
+    let word: U = EvmCdAddress::new(bytes).into();
+    let word: [u8; 32] = word.into();
+
+    assert_eq!(&word[..12], &[0; 12]);
+    assert_eq!(&word[12..], &bytes);
 }
 
 #[test]

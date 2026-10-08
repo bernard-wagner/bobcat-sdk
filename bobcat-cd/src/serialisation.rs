@@ -960,6 +960,14 @@ impl From<EvmCdAddress> for [u8; 20] {
     }
 }
 
+impl From<EvmCdAddress> for U {
+    fn from(address: EvmCdAddress) -> Self {
+        let mut word = [0u8; 32];
+        word[12..].copy_from_slice(address.as_array());
+        Self::from(word)
+    }
+}
+
 impl AsRef<[u8; 20]> for EvmCdAddress {
     fn as_ref(&self) -> &[u8; 20] {
         self.as_array()

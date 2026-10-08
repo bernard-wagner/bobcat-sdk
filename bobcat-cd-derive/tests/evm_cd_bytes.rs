@@ -24,8 +24,20 @@ enum GenericBytesCall<const CAP: usize> {
 
 #[derive(bobcat_cd_derive::EvmCdSerialise)]
 #[evm_selector]
+enum ConcreteGenericBytesCall {
+    Store(EvmCdBytes<64>),
+}
+
+#[derive(bobcat_cd_derive::EvmCdSerialise)]
+#[evm_selector]
 enum QualifiedBytesCall {
     Store(bobcat_cd::EvmCdBytes64),
+}
+
+#[derive(bobcat_cd_derive::EvmCdSerialise)]
+#[evm_selector]
+enum EmptyBytesCall {
+    Store(EvmCdBytes0),
 }
 
 #[test]
@@ -49,6 +61,30 @@ fn fixed_capacity_bytes_encode_like_vec_without_allocating() {
 }
 
 #[test]
+fn fixed_capacity_bytes_call_has_a_compile_time_capacity_array() {
+    let bytes = EvmCdBytes64::try_from_slice(&[1, 2, 3]).unwrap();
+    let encoded: [u8; 132] = BytesCall::Store(bytes).to_evm_array().unwrap();
+
+    assert_eq!(&encoded[..4], &const_keccak_sel(b"store(bytes)"));
+    assert_eq!(encoded[35], 32);
+    assert_eq!(encoded[67], 3);
+    assert_eq!(&encoded[68..71], &[1, 2, 3]);
+    assert!(encoded[71..].iter().all(|byte| *byte == 0));
+
+    let generic_capacity: [u8; 132] =
+        GenericBytesCall::<64>::Store(EvmCdBytes::<64>::try_from_slice(&[1, 2, 3]).unwrap())
+            .to_evm_array::<132>()
+            .unwrap();
+    assert_eq!(generic_capacity, encoded);
+
+    let generic: [u8; 132] =
+        ConcreteGenericBytesCall::Store(EvmCdBytes::<64>::try_from_slice(&[1, 2, 3]).unwrap())
+            .to_evm_array()
+            .unwrap();
+    assert_eq!(generic, encoded);
+}
+
+#[test]
 fn aliases_cover_zero_through_1024() {
     let empty = EvmCdBytes0::new();
     let largest = EvmCdBytes1024::try_from_slice(&[7; 1024]).unwrap();
@@ -68,6 +104,17 @@ fn zero_capacity_bytes_round_trip_as_empty_dynamic_bytes() {
 
     assert_eq!(encoded[31], 32);
     assert_eq!(EvmCdBytes0::deserialise(&encoded).unwrap(), value);
+}
+
+#[test]
+fn zero_capacity_bytes_call_has_a_compile_time_sized_array() {
+    let encoded: [u8; 68] = EmptyBytesCall::Store(EvmCdBytes0::new())
+        .to_evm_array()
+        .unwrap();
+
+    assert_eq!(&encoded[..4], &const_keccak_sel(b"store(bytes)"));
+    assert_eq!(encoded[35], 32);
+    assert!(encoded[36..].iter().all(|byte| *byte == 0));
 }
 
 #[test]

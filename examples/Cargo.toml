@@ -4,7 +4,8 @@ members = [
     "001-counter",
     "002-mul_div",
     "003-camelot-swapping",
-    "005-counter-bobcat-return"
+    "005-counter-bobcat-return",
+    "006-supercats"
 ]
 
 [workspace.dependencies]

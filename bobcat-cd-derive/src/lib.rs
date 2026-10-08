@@ -130,43 +130,11 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
         }
     };
     let to_evm_array_method = match (&input.data, direction) {
-        (Data::Struct(data), Direction::Serialise) => static_struct_serialised_size(data)
-            .map(|size| {
-                quote! {
-                    pub fn to_evm_array(
-                        &self,
-                    ) -> ::core::result::Result<[u8; #size], #cd::serialisation::Error> {
-                        let mut output = [0u8; #size];
-                        let mut writer = output.as_mut_slice();
-                        <Self as #cd::serialisation::EvmCdSerialise>::serialise_writer(
-                            self,
-                            &mut writer,
-                        )?;
-                        debug_assert!(writer.is_empty());
-                        ::core::result::Result::Ok(output)
-                    }
-                }
-            })
-            .unwrap_or_default(),
+        (Data::Struct(data), Direction::Serialise) => {
+            to_evm_array_method(static_struct_serialised_size(data), &cd)
+        }
         (Data::Enum(data), Direction::Serialise) if evm_selector => {
-            static_selector_enum_serialised_size(data)
-                .map(|size| {
-                    quote! {
-                        pub fn to_evm_array(
-                            &self,
-                        ) -> ::core::result::Result<[u8; #size], #cd::serialisation::Error> {
-                            let mut output = [0u8; #size];
-                            let mut writer = output.as_mut_slice();
-                            <Self as #cd::serialisation::EvmCdSerialise>::serialise_writer(
-                                self,
-                                &mut writer,
-                            )?;
-                            debug_assert!(writer.is_empty());
-                            ::core::result::Result::Ok(output)
-                        }
-                    }
-                })
-                .unwrap_or_default()
+            to_evm_array_method(static_selector_enum_serialised_size(data), &cd)
         }
         _ => TokenStream2::new(),
     };
@@ -237,6 +205,38 @@ fn expand(input: DeriveInput, direction: Direction) -> syn::Result<TokenStream2>
         },
     };
     Ok(output)
+}
+
+fn to_evm_array_method(size: Option<usize>, cd: &TokenStream2) -> TokenStream2 {
+    if let Some(size) = size {
+        quote! {
+            pub fn to_evm_array(
+                &self,
+            ) -> ::core::result::Result<[u8; #size], #cd::serialisation::Error> {
+                let mut output = [0u8; #size];
+                let mut writer = output.as_mut_slice();
+                <Self as #cd::serialisation::EvmCdSerialise>::serialise_writer(
+                    self,
+                    &mut writer,
+                )?;
+                ::core::result::Result::Ok(output)
+            }
+        }
+    } else {
+        quote! {
+            pub fn to_evm_array<const N: usize>(
+                &self,
+            ) -> ::core::result::Result<[u8; N], #cd::serialisation::Error> {
+                let mut output = [0u8; N];
+                let mut writer = output.as_mut_slice();
+                <Self as #cd::serialisation::EvmCdSerialise>::serialise_writer(
+                    self,
+                    &mut writer,
+                )?;
+                ::core::result::Result::Ok(output)
+            }
+        }
+    }
 }
 
 fn has_evm_values(input: &DeriveInput) -> syn::Result<bool> {
@@ -648,14 +648,40 @@ fn evm_cd_bytes_capacity(name: &str) -> Option<usize> {
     (capacity <= 1024 && width == capacity.to_string()).then_some(capacity)
 }
 
+fn evm_cd_bytes_type_capacity(segment: &syn::PathSegment) -> Option<usize> {
+    match &segment.arguments {
+        syn::PathArguments::None => evm_cd_bytes_capacity(&segment.ident.to_string()),
+        syn::PathArguments::AngleBracketed(arguments)
+            if segment.ident == "EvmCdBytes" && arguments.args.len() == 1 =>
+        {
+            let syn::GenericArgument::Const(syn::Expr::Lit(expression)) = arguments.args.first()?
+            else {
+                return None;
+            };
+            let syn::Lit::Int(capacity) = &expression.lit else {
+                return None;
+            };
+            let capacity = capacity.base10_parse().ok()?;
+            (capacity <= 1024).then_some(capacity)
+        }
+        _ => None,
+    }
+}
+
 fn static_abi_value_size(ty: &Type) -> Option<usize> {
     match ty {
         Type::Path(path) if path.qself.is_none() => {
             let segment = path.path.segments.last()?;
+            let name = segment.ident.to_string();
+            if let Some(capacity) = evm_cd_bytes_type_capacity(segment) {
+                // A fixed-capacity `bytes` value has a compile-time maximum:
+                // one offset word, one length word, and its word-padded data.
+                // Shorter values leave harmless zeroed trailing calldata.
+                return 64usize.checked_add(capacity.checked_add(31)? / 32 * 32);
+            }
             if !matches!(segment.arguments, syn::PathArguments::None) {
                 return None;
             }
-            let name = segment.ident.to_string();
             (matches!(
                 name.as_str(),
                 "U" | "bool"

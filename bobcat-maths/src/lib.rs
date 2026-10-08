@@ -1319,14 +1319,14 @@ impl U {
 
     /// Convert U to a lowercase hex string using a buffer.
     pub fn to_hex_str_buf<'a>(&'a self, buf: &'a mut [u8; 32 * 2]) -> &'a str {
-       const_hex::encode_to_str (self.0, buf).unwrap()
+        const_hex::encode_to_str(self.0, buf).unwrap()
     }
 
     /// Convert U to a lowercase hex array that can be written to with `from_utf8_unchecked`.
     pub fn to_hex_array(&self) -> [u8; 32 * 2] {
         let mut buf = [0u8; 32 * 2];
-       const_hex::encode_to_slice (self.0, &mut buf).unwrap();
-       buf
+        const_hex::encode_to_slice(self.0, &mut buf).unwrap();
+        buf
     }
 }
 
