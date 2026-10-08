@@ -6,15 +6,14 @@
 #![no_main]
 
 use bobcat_sdk::{
-    alloc::bobcat_allocator, entry::write_bool, storage::reentrancy_guard_sel,
+    alloc::bobcat_allocator, entry::write_bool, storage::transient_exchange,
+    maths::U,
 };
 
 bobcat_allocator!();
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn user_entrypoint(_: usize) -> usize {
-    reentrancy_guard_sel(&[1u8; 4], || {
-        write_bool(true);
-        0
-    })
+    write_bool(transient_exchange(&U::ONE, &U::ZERO, &U::ONE));
+    0
 }
