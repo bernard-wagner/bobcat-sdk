@@ -125,6 +125,15 @@ fn user_entrypoint(len: usize) -> usize {
         Entry::Symbol => {
             write_str("SPN CATS")
         }
+        Entry::TokenUri { token_id } => {
+           const URI_LEN: usize = 34;
+           const TOKEN_URI_LEN: usize = URI_LEN + size_of::<U>();
+           let mut buf = [0u8; TOKEN_URI_LEN];
+           buf.copy_from_slice(b"https://cats-cdn.superposition.so/");
+           let token_str_len = token_id.str_slice_buf(&mut buf[URI_LEN..].try_into().unwrap());
+           let len = URI_LEN + token_str_len;
+           write_array_slice_len::<TOKEN_URI_LEN, {TOKEN_URI_LEN + 32 * 2}>(buf, len)
+        }
         Entry::BalanceOf { owner } => {
             assert_ne!([0u8; 20], owner.0, "owner zero address");
             write_word(&storage::balance::get(&owner.into_array()))

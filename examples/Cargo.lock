@@ -74,9 +74,9 @@ dependencies = [
 
 [[package]]
 name = "bobcat-entrypoints"
-version = "0.1.5"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5f4277ccf1c3e50b9458fdbdc334a0f893524483ff6381eed4a477a02667e7"
+checksum = "6c46ea2ec9408d4e60c6107336f1c3200859a9738fd298dceffc4e53c52e02b4"
 dependencies = [
  "bobcat-cd",
 ]

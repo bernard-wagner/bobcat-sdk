@@ -1138,6 +1138,8 @@ impl U {
         Some(U(b))
     }
 
+    /// Write a string encoding of self to a buffer given. It can be converted
+    /// using `from_utf8_unchecked` to a string.
     pub const fn str_slice_buf(&self, res: &mut [u8; 78]) -> usize {
         if self.is_zero() {
             res[0] = b'0';

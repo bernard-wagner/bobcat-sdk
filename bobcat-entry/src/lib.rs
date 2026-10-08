@@ -59,16 +59,30 @@ pub fn write_bool(v: bool) {
 const OFFSET_ARR: [u8; 32] = U::from_u32(32).0;
 
 /// Helper function that create a fresh array with the length and offset
-/// by concatinating arrays.
-pub fn write_array_slice<const ARR_LEN: usize, const CD_LEN: usize>(arr: [u8; ARR_LEN]) {
+/// by concatinating arrays. Only writes in the end the array length
+/// given. CD_LEN is the total length, so must be 32 * 2 + ARR_LEN.
+pub fn write_array_slice_len<const ARR_LEN: usize, const CD_LEN: usize>(
+    arr: [u8; ARR_LEN],
+    len_arr: usize,
+) {
     assert!(
         ARR_LEN + 32 * 2 == CD_LEN,
         "bad array length, need: {}",
         ARR_LEN + 32 * 2
     );
+    assert!(
+        ARR_LEN >= len_arr,
+        "array length {len_arr} larger than buffer {ARR_LEN}"
+    );
     let U(len_arr) = U::from_usize(ARR_LEN);
-    let x: [u8; ARR_LEN] = concat_arrays!(OFFSET_ARR, len_arr, arr);
+    let x: [u8; CD_LEN] = concat_arrays!(OFFSET_ARR, len_arr, arr);
     write_slice(&x)
+}
+
+/// Helper function that create a fresh array with the length and offset
+/// by concatinating arrays. CD_LEN is the total length, so must be 32 * 2 + ARR_LEN.
+pub fn write_array_slice<const ARR_LEN: usize, const CD_LEN: usize>(arr: [u8; ARR_LEN]) {
+    write_array_slice_len::<ARR_LEN, CD_LEN>(arr, ARR_LEN)
 }
 
 #[cfg(feature = "alloc")]
