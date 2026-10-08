@@ -146,6 +146,10 @@ const DATA_CAP: usize = 1000;
 fn user_entrypoint(len: usize) -> usize {
     reentrancy_guard(||
     match read_cd::<Entry>(len) {
+        Entry::Mint { owner, token_id } => {
+            storage::balance::incr(owner);
+            storage::owner_of::set(token_id, owner)
+        }
         Entry::Name => write_str("Superposition Supercats"),
         Entry::Symbol => write_str("SPN CATS"),
         Entry::TokenUri { token_id } => {

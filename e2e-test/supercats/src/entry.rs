@@ -1,9 +1,12 @@
-
-use bobcat_sdk::cd::{U, EvmCdSerialise, EvmCdDeserialise, EvmCdAddress, EvmCdBytes};
+use bobcat_sdk::cd::{EvmCdAddress, EvmCdBytes, EvmCdDeserialise, EvmCdSerialise, U};
 
 #[derive(Debug, Clone, PartialEq, EvmCdSerialise, EvmCdDeserialise)]
 #[evm_selector]
 pub enum Eip721MetadataDataSlice<const MAX_DATA: usize> {
+    Mint {
+        owner: EvmCdAddress,
+        token_id: U,
+    },
     BalanceOf {
         owner: EvmCdAddress,
     },
@@ -45,5 +48,7 @@ pub enum Eip721MetadataDataSlice<const MAX_DATA: usize> {
     Name,
     Symbol,
     #[evm_selector("tokenURI(uint256)")]
-    TokenUri { token_id: U }
+    TokenUri {
+        token_id: U,
+    },
 }

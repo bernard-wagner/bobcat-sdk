@@ -2,12 +2,12 @@
 #![no_std]
 
 use bobcat_sdk::{
+    alloc::bobcat_allocator,
     cd::{const_keccak_sel, read_words},
     create::create1_slice,
     entry::*,
     maths::U,
     proxy::make_beacon_proxy,
-    alloc::bobcat_allocator,
 };
 
 bobcat_allocator!();

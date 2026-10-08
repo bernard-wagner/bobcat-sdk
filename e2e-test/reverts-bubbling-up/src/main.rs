@@ -8,7 +8,7 @@ use bobcat_sdk::{
         contract_address, msg_sender, read_args_safe, read_words, revert_if_bad_call_unit_vec,
     },
     interfaces::eip20::make_fn_transfer_from,
-    maths::{u, U},
+    maths::{U, u},
 };
 
 bobcat_allocator!();

@@ -2,12 +2,12 @@
 #![no_std]
 
 use bobcat_sdk::{
-    proxy::make_eip1967_proxy,
-    entry::{write_word, read_args_safe},
-    maths::U,
+    alloc::bobcat_allocator,
     cd::read_words,
     create::create1_unit,
-    alloc::bobcat_allocator
+    entry::{read_args_safe, write_word},
+    maths::U,
+    proxy::make_eip1967_proxy,
 };
 
 bobcat_allocator!();

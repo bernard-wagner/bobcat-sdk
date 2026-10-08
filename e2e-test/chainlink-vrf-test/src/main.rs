@@ -6,9 +6,8 @@
 #![no_main]
 
 use bobcat_sdk::{
-    call::call_word_err_vec, cd::*, entry::*,
+    alloc::bobcat_allocator, call::call_word_err_vec, cd::*, entry::*,
     interfaces::chainlink_vrf::make_fn_request_words_in_native_no_bytes, maths::U, storage::*,
-    alloc::bobcat_allocator,
 };
 
 bobcat_allocator!();

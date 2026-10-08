@@ -17,9 +17,12 @@ macro_rules! storage {
         pub mod $name {
             pub(crate) use bobcat_sdk::storage::*;
             use bobcat_sdk::maths::{u, U};
+
             const SLOT: U = u!($counter);
+
             storage!(@impl [$($param),*]);
         }
+
         $(
             storage! {
                 @internal
@@ -50,7 +53,7 @@ macro_rules! storage {
     };
     (@impl [$param1:ident]) => {
         pub fn slot($param1: &U) -> U {
-            slot_map(&SLOT, $param1)
+            slot_map($param1, &SLOT)
         }
         pub fn get($param1: &U) -> U {
             storage_load(&slot($param1))
@@ -64,10 +67,13 @@ macro_rules! storage {
         pub fn sub($param1: &U, x: &U) -> Option<()> {
             storage_checked_sub(&slot($param1), x)
         }
+        pub fn clear($param1: &U) {
+            set($param1, &U::ZERO)
+        }
     };
     (@impl [$param1:ident, $param2:ident]) => {
         pub fn slot($param1: &U, $param2: &U) -> U {
-            slot_map(&slot_map(&SLOT, $param1), $param2)
+            slot_map($param2, &slot_map($param1, &SLOT))
         }
         pub fn get($param1: &U, $param2: &U) -> U {
             storage_load(&slot($param1, $param2))
@@ -80,6 +86,9 @@ macro_rules! storage {
         }
         pub fn sub($param1: &U, $param2: &U, x: &U) -> Option<()> {
             storage_checked_sub(&slot($param1, $param2), x)
+        }
+        pub fn clear($param1: &U, $param2: &U) {
+            set($param1, $param2, &U::ZERO)
         }
     };
 }

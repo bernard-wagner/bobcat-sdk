@@ -5,10 +5,7 @@
 #![no_std]
 #![no_main]
 
-use bobcat_sdk::{
-    alloc::bobcat_allocator, entry::write_bool, storage::transient_exchange,
-    maths::U,
-};
+use bobcat_sdk::{entry::write_bool, maths::U, storage::transient_exchange, alloc::bobcat_allocator};
 
 bobcat_allocator!();
 

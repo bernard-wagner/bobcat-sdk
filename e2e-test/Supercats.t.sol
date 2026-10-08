@@ -7,6 +7,7 @@ import {MockERC721} from "../forge-libs/solady/test/utils/mocks/MockERC721.sol";
 import {IArbFoundry} from "./IArbFoundry.sol";
 
 interface IERC721Supercats {
+    function mint(address owner, uint256 id) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function tokenURI(uint256 id) external view returns (string memory);
@@ -115,13 +116,8 @@ contract SupercatsTest is Test {
         referenceToken = new MockERC721();
     }
 
-    // Supercats has no public mint function. Seed the same logical minted state in its
-    // documented Solidity mapping layout, then mint the referenceToken Solady token normally.
     function _mintFixture(uint256 id, address owner) internal {
-        bytes32 balanceSlot = keccak256(abi.encode(owner, uint256(0)));
-        bytes32 ownerSlot = keccak256(abi.encode(id, uint256(1)));
-        vm.store(address(token), balanceSlot, bytes32(uint256(1)));
-        vm.store(address(token), ownerSlot, bytes32(uint256(uint160(owner))));
+        token.mint(owner, id);
         referenceToken.mint(owner, id);
     }
 
