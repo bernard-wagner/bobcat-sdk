@@ -11,6 +11,8 @@ use const_hex::display as hex_display;
 
 mod storage;
 
+const CDN_URI_CATS: &'static str = "https://cats-cdn.superposition.so/";
+
 fn assert_can_transfer(from: &[u8; 20], to: &[u8; 20], token_id: &U) -> [u8; 20] {
     let owner: [u8; 20] = storage::owner_of::get(token_id).into();
     assert_eq!(
@@ -129,7 +131,7 @@ fn user_entrypoint(len: usize) -> usize {
            const URI_LEN: usize = 34;
            const TOKEN_URI_LEN: usize = URI_LEN + size_of::<U>();
            let mut buf = [0u8; TOKEN_URI_LEN];
-           buf.copy_from_slice(b"https://cats-cdn.superposition.so/");
+           buf.copy_from_slice(CDN_URI_CATS.as_bytes());
            let token_str_len = token_id.str_slice_buf(&mut buf[URI_LEN..].try_into().unwrap());
            let len = URI_LEN + token_str_len;
            write_array_slice_len::<TOKEN_URI_LEN, {TOKEN_URI_LEN + 32 * 2}>(buf, len)
