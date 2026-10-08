@@ -4,3 +4,6 @@
 [submodule "e2e-test/superposition-precompiles"]
 	path = e2e-test/superposition-precompiles
 	url = https://github.com/fluidity-money/superposition-precompiles
+[submodule "forge-libs/solady"]
+	path = forge-libs/solady
+	url = https://github.com/Vectorized/solady

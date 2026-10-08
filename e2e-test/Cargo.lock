@@ -55,37 +55,64 @@ dependencies = [
 
 [[package]]
 name = "bobcat-alloc"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "mini-alloc",
 ]
 
 [[package]]
 name = "bobcat-call"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "bobcat-entry",
- "bobcat-host",
- "bobcat-maths",
- "bobcat-panic",
+ "bobcat-host 0.11.8",
+ "bobcat-maths 0.11.8",
+ "bobcat-panic 0.11.8",
  "const-hex",
  "paste",
 ]
 
 [[package]]
 name = "bobcat-cd"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-cd-derive",
- "bobcat-maths",
- "bobcat-storage",
+ "bobcat-cd-derive 0.11.8",
+ "bobcat-maths 0.11.8",
+ "bobcat-storage 0.11.8",
+ "const-hex",
+]
+
+[[package]]
+name = "bobcat-cd"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47abd7327cce2add84851d74a1661367f0b78b8db5e4f1915c9b2290f3027db8"
+dependencies = [
+ "array-concat",
+ "bobcat-cd-derive 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bobcat-maths 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bobcat-storage 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "const-hex",
 ]
 
 [[package]]
 name = "bobcat-cd-derive"
-version = "0.11.6"
+version = "0.11.8"
+dependencies = [
+ "heck",
+ "keccak-const",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "bobcat-cd-derive"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f2c3f49df07dd08bbfd2e598d9587b236c0a6ce9c39725a20a678a56736eba1"
 dependencies = [
  "heck",
  "keccak-const",
@@ -97,58 +124,77 @@ dependencies = [
 
 [[package]]
 name = "bobcat-console"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
- "bobcat-host",
+ "bobcat-host 0.11.8",
 ]
 
 [[package]]
 name = "bobcat-create"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-host",
- "bobcat-maths",
+ "bobcat-host 0.11.8",
+ "bobcat-maths 0.11.8",
  "bobcat-proxy",
- "bobcat-storage",
+ "bobcat-storage 0.11.8",
 ]
 
 [[package]]
 name = "bobcat-entry"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-cd",
- "bobcat-host",
- "bobcat-maths",
- "bobcat-storage",
+ "bobcat-cd 0.11.8",
+ "bobcat-host 0.11.8",
+ "bobcat-maths 0.11.8",
+ "bobcat-storage 0.11.8",
  "const-hex",
 ]
 
 [[package]]
+name = "bobcat-entrypoints"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c46ea2ec9408d4e60c6107336f1c3200859a9738fd298dceffc4e53c52e02b4"
+dependencies = [
+ "bobcat-cd 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "bobcat-events"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-host",
- "bobcat-maths",
+ "bobcat-host 0.11.8",
+ "bobcat-maths 0.11.8",
 ]
 
 [[package]]
 name = "bobcat-features"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "bobcat-call",
  "bobcat-entry",
- "bobcat-host",
+ "bobcat-host 0.11.8",
  "bobcat-interfaces",
- "bobcat-storage",
+ "bobcat-storage 0.11.8",
  "paste",
 ]
 
 [[package]]
 name = "bobcat-host"
-version = "0.11.6"
+version = "0.11.8"
+dependencies = [
+ "const-hex",
+ "keccak-const",
+]
+
+[[package]]
+name = "bobcat-host"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80fa16dae301dfd8a11753b0f4468528f9162ecf7f045956f4d897fc4d21de0d"
 dependencies = [
  "const-hex",
  "keccak-const",
@@ -156,23 +202,39 @@ dependencies = [
 
 [[package]]
 name = "bobcat-interfaces"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-cd",
- "bobcat-maths",
- "bobcat-storage",
+ "bobcat-cd 0.11.8",
+ "bobcat-maths 0.11.8",
+ "bobcat-storage 0.11.8",
  "const-hex",
 ]
 
 [[package]]
 name = "bobcat-maths"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "alloy-primitives",
  "array-concat",
- "bobcat-host",
- "bobcat-panic",
+ "bobcat-host 0.11.8",
+ "bobcat-panic 0.11.8",
+ "cfg-if",
+ "const-hex",
+ "mutants",
+ "num-traits",
+ "paste",
+]
+
+[[package]]
+name = "bobcat-maths"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d14fbc6922e9f1eac5be552262e6552ab2634f2fb791def7fb5a3b7768404671"
+dependencies = [
+ "array-concat",
+ "bobcat-host 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bobcat-panic 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if",
  "const-hex",
  "mutants",
@@ -182,70 +244,94 @@ dependencies = [
 
 [[package]]
 name = "bobcat-panic"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
- "bobcat-host",
+ "bobcat-host 0.11.8",
+ "const-hex",
+ "paste",
+]
+
+[[package]]
+name = "bobcat-panic"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb913a22898f89f19d5df9bf2bc3386e8cea5f2aab1db32011d9dc5c321dda97"
+dependencies = [
+ "bobcat-host 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "const-hex",
  "paste",
 ]
 
 [[package]]
 name = "bobcat-precompiles"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
  "bobcat-call",
- "bobcat-cd",
- "bobcat-maths",
- "bobcat-storage",
+ "bobcat-cd 0.11.8",
+ "bobcat-maths 0.11.8",
+ "bobcat-storage 0.11.8",
  "const-hex",
 ]
 
 [[package]]
 name = "bobcat-proxy"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
  "bobcat-interfaces",
- "bobcat-maths",
+ "bobcat-maths 0.11.8",
  "const-hex",
 ]
 
 [[package]]
 name = "bobcat-sdk"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "bobcat-alloc",
  "bobcat-call",
- "bobcat-cd",
+ "bobcat-cd 0.11.8",
  "bobcat-console",
  "bobcat-create",
  "bobcat-entry",
  "bobcat-events",
  "bobcat-features",
- "bobcat-host",
+ "bobcat-host 0.11.8",
  "bobcat-interfaces",
- "bobcat-maths",
- "bobcat-panic",
+ "bobcat-maths 0.11.8",
+ "bobcat-panic 0.11.8",
  "bobcat-precompiles",
  "bobcat-proxy",
- "bobcat-storage",
+ "bobcat-storage 0.11.8",
 ]
 
 [[package]]
 name = "bobcat-storage"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "array-concat",
- "bobcat-host",
- "bobcat-maths",
+ "bobcat-host 0.11.8",
+ "bobcat-maths 0.11.8",
+ "keccak-const",
+ "paste",
+]
+
+[[package]]
+name = "bobcat-storage"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42024172d0c94a9178be8681bebad3c056baa43231aeaa9a625c30b90305cb04"
+dependencies = [
+ "array-concat",
+ "bobcat-host 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bobcat-maths 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "keccak-const",
  "paste",
 ]
 
 [[package]]
 name = "bobcat-trace-derive"
-version = "0.11.6"
+version = "0.11.8"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -284,9 +370,9 @@ dependencies = [
 
 [[package]]
 name = "const-hex"
-version = "1.19.1"
+version = "1.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33e2a781ebdf4467d1428dc4593067825fb646f6871475098d8577421af73558"
+checksum = "0e59eef12462b0f9b0a3620219be5d639afd79fe39dff0a42c3997061f9298b4"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
@@ -816,6 +902,15 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "supercats"
+version = "0.1.11"
+dependencies = [
+ "bobcat-entrypoints",
+ "bobcat-sdk",
+ "const-hex",
+]
 
 [[package]]
 name = "syn"

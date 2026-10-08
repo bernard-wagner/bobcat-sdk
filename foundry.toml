@@ -24,7 +24,8 @@ fs_permissions = [
 	{ access = "read", path = "e2e-test/zeroise-check.wasm" },
 	{ access = "read", path = "e2e-test/slot-key.wasm" },
 	{ access = "read", path = "e2e-test/derive-trace.wasm" },
-	{ access = "read", path = "e2e-test/superposition-precompiles/precompiles-xz.wasm" }
+	{ access = "read", path = "e2e-test/superposition-precompiles/precompiles-xz.wasm" },
+	{ access = "read", path = "e2e-test/supercats.wasm" },
 ]
 evm_version = "osaka"
 

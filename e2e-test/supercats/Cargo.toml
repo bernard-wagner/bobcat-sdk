@@ -1,0 +1,13 @@
+[package]
+name = "supercats"
+version = "0.1.11"
+edition = "2024"
+
+[dependencies]
+bobcat-entrypoints = { version = ">=0.1.7", default-features = false }
+bobcat-sdk = { workspace = true, features = ["panic"] }
+const-hex = { version = "1.19.3", default-features = false }
+
+[[bin]]
+name = "bobcat-sdk-examples-006"
+path = "src/main.rs"

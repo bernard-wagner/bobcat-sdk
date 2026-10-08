@@ -25,7 +25,8 @@ PROJECTS := \
 	features \
 	zeroise-check \
 	slot-key \
-	derive-trace
+	derive-trace \
+	supercats
 
 all: wasm
 
@@ -54,7 +55,8 @@ wasm: \
 	features.wasm \
 	zeroise-check.wasm \
 	slot-key.wasm \
-	derive-trace.wasm
+	derive-trace.wasm \
+	supercats.wasm
 
 chainlink-vrf-test.wasm: ${BUILT}
 	@./wasm-post.sh ${RELEASE}/chainlink-vrf-test.wasm chainlink-vrf-test.wasm
@@ -119,6 +121,9 @@ slot-key.wasm: ${BUILT}
 derive-trace.wasm: ${BUILT}
 	@./wasm-post.sh ${RELEASE}/derive-trace.wasm derive-trace.wasm
 
+supercats.wasm: ${BUILT}
+	@./wasm-post.sh ${RELEASE}/supercats.wasm supercats.wasm
+
 clean:
 	@rm -rf \
 		target \
@@ -141,4 +146,5 @@ clean:
 		features.wasm \
 		zeroise-check.wasm \
 		slot-key.wasm \
-		derive-trace.wasm
+		derive-trace.wasm \
+		supercats.wasm

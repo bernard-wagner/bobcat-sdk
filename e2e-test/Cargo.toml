@@ -18,7 +18,8 @@ members = [
 	"features",
 	"zeroise-check",
 	"slot-key",
-	"derive-trace"
+	"derive-trace",
+	"supercats"
 ]
 
 [workspace.dependencies]
