@@ -617,6 +617,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "openzeppelin-stylus",
+ "ruint",
  "stylus-sdk",
 ]
 
@@ -651,15 +652,15 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "ruint"
-version = "1.20.1"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2973657b5127d510e230f5c63d2d106af9c8f79393d8b9f4647323e8196bdde5"
+checksum = "9ecb38f82477f20c5c3d62ef52d7c4e536e38ea9b73fb570a20c5cae0e14bcf6"
 dependencies = [
  "proptest",
  "rand 0.8.8",
  "rand 0.9.5",
  "ruint-macro",
- "serde_core",
+ "serde",
  "valuable",
  "zeroize",
 ]

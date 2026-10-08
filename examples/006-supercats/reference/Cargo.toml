@@ -5,9 +5,15 @@ name = "reference"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["lib", "cdylib"]
+
 [dependencies]
 alloy-primitives = { version = "=0.8.20", default-features = false }
 alloy-sol-types = { version = "=0.8.20", default-features = false }
+# stylus-sdk 0.9 serializes narrow Uint values into 32-byte storage words;
+# ruint 1.17+ rejects that legacy to_{be,le}_bytes::<32>() usage.
+ruint = { version = ">=1.16, <1.17", default-features = false }
 stylus-sdk = "=0.9.0"
 openzeppelin-stylus = "=0.3.0"
 
