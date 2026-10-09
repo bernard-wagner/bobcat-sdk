@@ -6,8 +6,15 @@
 #![no_main]
 
 use bobcat_sdk::{
-    alloc::bobcat_allocator, call::call_word_err_vec, cd::*, entry::*,
-    interfaces::chainlink_vrf::make_fn_request_words_in_native_no_bytes, maths::U, storage::*,
+    alloc::bobcat_allocator,
+    call::call_word_err_vec,
+    cd::*,
+    entry::*,
+    interfaces::chainlink_vrf::{
+        REQUEST_WORDS_NATIVE_SLICE_BASE, make_fn_request_words_in_native_slice,
+    },
+    maths::U,
+    storage::*,
 };
 
 bobcat_allocator!();
@@ -38,12 +45,18 @@ pub unsafe extern "C" fn user_entrypoint(args_len: usize) -> usize {
         let sel: [u8; 4] = args[..4].try_into().unwrap();
         match sel {
             SEL_INITIATE => {
-                // This allocates a word for a simple U256 return, or reverts with a vec
-                // if that's what's needed. For the allocation of the request for the
-                // random words, we don't need any values, so we use the simple version.
+                // Native-payment requests require a tagged ExtraArgsV1(true), not empty bytes.
+                let mut extra_args = [0u8; 36];
+                extra_args[..4].copy_from_slice(&const_keccak_sel(b"VRF ExtraArgsV1"));
+                extra_args[35] = 1;
+                // Return the request ID, or bubble up the coordinator's revert data.
                 write_word(&revert_if_bad_call_slice_vec!(call_word_err_vec(
                     ADDR_CHAINLINK_VRF_COORDINATOR_SEPOLIA,
-                    &make_fn_request_words_in_native_no_bytes(100_000, 2, WORD_COUNT as u32),
+                    &make_fn_request_words_in_native_slice::<
+                        36,
+                        28,
+                        { REQUEST_WORDS_NATIVE_SLICE_BASE + 64 },
+                    >(100_000, 2, WORD_COUNT as u32, extra_args),
                     &msg_value(),
                     u64::MAX
                 )));
