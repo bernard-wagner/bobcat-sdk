@@ -36,6 +36,8 @@ ${BUILT}: $(shell find ${PROJECTS} Cargo.toml -type f)
 	@cargo build --target wasm32-unknown-unknown --release
 
 wasm: \
+	example-counter.wasm \
+	example-camelot.wasm \
 	chainlink-vrf-test.wasm \
 	transient-exchange.wasm \
 	console-log-txt.wasm \
@@ -57,6 +59,14 @@ wasm: \
 	slot-key.wasm \
 	derive-trace.wasm \
 	supercats.wasm
+
+example-counter.wasm: $(shell find ../examples/001-counter -name '*.rs' -o -name Cargo.toml) ../examples/Cargo.toml wasm-post.sh
+	@cargo build --manifest-path ../examples/Cargo.toml --target wasm32-unknown-unknown --release -p bobcat-sdk-examples-001
+	@./wasm-post.sh ../examples/${RELEASE}/bobcat_sdk_examples_001.wasm example-counter.wasm
+
+example-camelot.wasm: $(shell find ../examples/003-camelot-swapping/src -name '*.rs') ../examples/003-camelot-swapping/Cargo.toml ../examples/Cargo.toml wasm-post.sh
+	@cargo build --manifest-path ../examples/Cargo.toml --target wasm32-unknown-unknown --release -p bobcat-sdk-examples-003
+	@./wasm-post.sh ../examples/${RELEASE}/bobcat-sdk-examples-003.wasm example-camelot.wasm
 
 chainlink-vrf-test.wasm: ${BUILT}
 	@./wasm-post.sh ${RELEASE}/chainlink-vrf-test.wasm chainlink-vrf-test.wasm

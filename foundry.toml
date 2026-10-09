@@ -1,9 +1,13 @@
 [profile.default]
+network = "arbitrum"
+isolate = true
 out = "out"
 libs = ["forge-libs"]
 test = "e2e-test"
 gas_snapshot_emit = true
 fs_permissions = [
+	{ access = "read", path = "e2e-test/example-counter.wasm" },
+	{ access = "read", path = "e2e-test/example-camelot.wasm" },
 	{ access = "read", path = "e2e-test/chainlink-vrf-test.wasm"},
 	{ access = "read", path = "e2e-test/transient-exchange.wasm"},
 	{ access = "read", path = "e2e-test/console-log-txt.wasm"},

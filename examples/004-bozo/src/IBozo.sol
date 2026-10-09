@@ -4,18 +4,13 @@ pragma solidity 0.8.20;
 interface IBozo {
     function initialise(address admin, address asset) external;
 
-    function play(
-        uint256 amount,
-        address recipient,
-        bytes32 comment,
-        uint256 desiredEpoch
-    ) external returns (uint256 epoch, uint256 deposited);
+    function play(uint256 amount, address recipient, bytes32 comment, uint256 desiredEpoch)
+        external
+        returns (uint256 epoch, uint256 deposited);
 
-    function distributeRewards(
-        uint256 epoch,
-        address rewardRecipient,
-        uint256 rngWord
-    ) external returns (uint256 winnerReward);
+    function distributeRewards(uint256 epoch, address rewardRecipient, uint256 rngWord)
+        external
+        returns (uint256 winnerReward);
 
     function poolSize() external view returns (uint256);
     function poolAsset() external view returns (address);
@@ -33,22 +28,15 @@ interface IBozo {
 
     function changeAdmin(address newAdmin) external;
 
-    event CommentPosted(
-        address indexed poster,
-        bytes32 indexed hash
-    );
+    function ownerCollectFees() external returns (uint256);
 
-    event DepositMade(
-        address indexed recipient,
-        uint256 indexed amount,
-        uint256 indexed currentPool
-    );
+    function daoCollectFees() external returns (uint256);
 
-    event WinnerChosen(
-        address indexed recipient,
-        uint256 indexed amount,
-        bool indexed isLottery
-    );
+    event CommentPosted(address indexed poster, bytes32 indexed hash);
+
+    event DepositMade(address indexed recipient, uint256 indexed amount, uint256 indexed currentPool);
+
+    event WinnerChosen(address indexed recipient, uint256 indexed amount, bool indexed isLottery);
 
     event NewEpoch(uint256 indexed last);
 }

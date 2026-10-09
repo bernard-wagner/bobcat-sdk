@@ -1,5 +1,9 @@
 [profile.default]
+network = "arbitrum"
 src = "src"
 out = "out"
 libs = ["../../forge-libs"]
-fs_permissions = [{ access = "read", path = "bozo.wasm"}]
+fs_permissions = [
+    { access = "read", path = "bozo.wasm" },
+    { access = "read", path = "../../e2e-test/eip1967-proxy.wasm" }
+]

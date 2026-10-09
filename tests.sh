@@ -11,3 +11,7 @@ make
 cd ../e2e-test
 
 ./tests.sh
+
+cd ../examples/004-bozo
+
+./tests.sh
