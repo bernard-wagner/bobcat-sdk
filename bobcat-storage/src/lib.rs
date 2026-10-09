@@ -72,7 +72,7 @@ pub fn transient_store_bool(x: &U, y: bool) {
     transient_store(x, &U::from(y))
 }
 
-pub fn flush_cache() {
+pub unsafe fn flush_cache() {
     unsafe { host::storage_flush_cache(false) }
 }
 
@@ -80,7 +80,7 @@ pub fn flush_cache() {
 /// has run.
 pub fn flush_guard<R, F: FnOnce() -> R>(f: F) -> R {
     let r = f();
-    flush_cache();
+    unsafe { flush_cache() };
     r
 }
 
@@ -99,7 +99,7 @@ pub fn flush_guard_fresh<R, F: FnOnce() -> R>(f: F) -> R {
     ))]
     host::storage_reset();
     let r = f();
-    flush_cache();
+    unsafe { flush_cache() };
     r
 }
 

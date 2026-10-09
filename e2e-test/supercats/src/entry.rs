@@ -45,6 +45,9 @@ pub enum Eip721MetadataDataSlice<const MAX_DATA: usize> {
         owner: EvmCdAddress,
         operator: EvmCdAddress,
     },
+    SupportsInterface {
+        interface_id: [u8; 4],
+    },
     Name,
     Symbol,
     #[evm_selector("tokenURI(uint256)")]

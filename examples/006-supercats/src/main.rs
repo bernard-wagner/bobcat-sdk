@@ -3,13 +3,11 @@
 
 use bobcat_sdk::prelude::*;
 
-type Entry = Eip721MetadataDataSlice<1000>;
+type Entry = bobcat_entrypoints::Eip721MetadataDataSlice<1000>;
 
 use const_hex::display as hex_display;
 
 mod storage;
-
-use bobcat_entrypoints::Eip721MetadataDataSlice;
 
 const CDN_URI_CATS: &'static str = "https://cats-cdn.superposition.so/";
 
@@ -69,7 +67,8 @@ fn safe_transfer<const DATA_CAP: usize>(
 ) {
     let sender = transfer_from(from, to, token_id);
     if addr_has_code(to) {
-        let (rc, _, rd) = call_slice::<4>(
+        unsafe { flush_cache() };
+        let (rc, rd) = call_word(
             to,
             &Erc721Cb::OnErc721Received {
                 operator: EvmCdAddress::new(sender),
@@ -86,8 +85,10 @@ fn safe_transfer<const DATA_CAP: usize>(
             u64::MAX,
             0,
         );
-        assert!(rc, "callback failed");
-        assert_eq!(ERC721_CB_SEL, rd, "selector not equal");
+        assert!(rc, "callback check failed");
+        let mut exp = U::ZERO;
+        exp.0[..4].copy_from_slice(&ERC721_CB_SEL);
+        assert_eq!(exp, rd, "selector not equal");
     }
 }
 
@@ -120,7 +121,6 @@ const DATA_CAP: usize = 1000;
 
 #[unsafe(no_mangle)]
 fn user_entrypoint(len: usize) -> usize {
-    reentrancy_guard(||
     match read_cd::<Entry>(len) {
         Entry::Name => write_str("Superposition Supercats"),
         Entry::Symbol => write_str("SPN CATS"),
@@ -177,6 +177,6 @@ fn user_entrypoint(len: usize) -> usize {
         Entry::SetApprovalForAll { operator, approved } => {
             flush_guard(|| set_approval_for_all(operator.into(), approved))
         }
-    });
+    };
     0
 }

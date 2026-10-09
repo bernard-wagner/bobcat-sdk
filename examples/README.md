@@ -22,7 +22,7 @@ Note that stylus-sdk accidentally bundles the std with its built code.
 
 |    Name   | stylus-sdk (0.9.0) | bobcat-sdk |                          Description                           |
 |-----------|--------------------|------------|----------------------------------------------------------------|
-| Supercats | 89413              | 18927      | NFT contract code for Superposition Supercats on Arbitrum One. |
+| Supercats | 89413              | 22265      | NFT contract code for Superposition Supercats on Arbitrum One. |
 
 The Supercats example reference is a copy and paste from the OpenZeppelin NFT wizard. The
 code was compiled with `cargo stylus build`. The OZ SDK for this only supports Stylus

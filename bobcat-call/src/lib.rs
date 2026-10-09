@@ -39,13 +39,12 @@ pub fn read_return_data_vec(offset: usize, size: usize) -> Vec<u8> {
 }
 
 pub fn addr_has_code(addr: Address) -> bool {
-    // It costs to use the length instead of the codehash, so we do it this
-    // way for free. We compare it against the zero code hash:
-    code_hash(addr).0
-        != [
-            197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182,
-            83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112,
-        ]
+    code_hash(addr).is_some()
+        && code_hash(addr).0
+            != [
+                197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0,
+                182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112,
+            ]
 }
 
 macro_rules! generate_call_variants {

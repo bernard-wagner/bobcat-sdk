@@ -1180,11 +1180,7 @@ impl U {
 
     pub const fn str<'a>(&'a self, result: &'a mut [u8; 78]) -> &'a str {
         let i = self.str_slice_buf(result);
-        unsafe {
-            core::str::from_utf8_unchecked(
-                core::slice::from_raw_parts(result.as_ptr(), i)
-            )
-        }
+        unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(result.as_ptr(), i)) }
     }
 
     /// Get a slice that can be converted to utf8 with

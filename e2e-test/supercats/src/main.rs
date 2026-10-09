@@ -72,7 +72,8 @@ fn safe_transfer<const DATA_CAP: usize>(
 ) {
     let sender = transfer_from(from, to, token_id);
     if addr_has_code(to) {
-        let (rc, _, rd) = call_slice::<4>(
+        unsafe { flush_cache() };
+        let (rc, rd) = call_word(
             to,
             &Erc721Cb::OnErc721Received {
                 operator: EvmCdAddress::new(sender),
@@ -89,8 +90,10 @@ fn safe_transfer<const DATA_CAP: usize>(
             u64::MAX,
             0,
         );
-        assert!(rc, "callback failed");
-        assert_eq!(ERC721_CB_SEL, rd, "selector not equal");
+        assert!(rc, "callback check failed");
+        let mut exp = U::ZERO;
+        exp.0[..4].copy_from_slice(&ERC721_CB_SEL);
+        assert_eq!(exp, rd, "selector not equal");
     }
 }
 
@@ -123,7 +126,7 @@ const DATA_CAP: usize = 1000;
 
 #[unsafe(no_mangle)]
 fn user_entrypoint(len: usize) -> usize {
-    reentrancy_guard(|| match read_cd::<Entry>(len) {
+    match read_cd::<Entry>(len) {
         Entry::Mint { owner, token_id } => flush_guard(|| {
             storage::balance::incr(owner);
             storage::owner_of::set(token_id, owner);
@@ -167,6 +170,10 @@ fn user_entrypoint(len: usize) -> usize {
         Entry::IsApprovedForAll { owner, operator } => {
             write_word(&storage::approved_for_all::get(owner.0, operator.0))
         }
+        Entry::SupportsInterface { interface_id } => write_word(&U::from(matches!(
+            interface_id,
+            [0x01, 0xff, 0xc9, 0xa7] | [0x80, 0xac, 0x58, 0xcd] | [0x5b, 0x5e, 0x13, 0x9f]
+        ))),
         Entry::SafeTransferFrom { from, to, token_id } => {
             flush_guard(|| safe_transfer(from.into(), to.into(), token_id, [0u8; DATA_CAP], 0))
         }
@@ -183,6 +190,6 @@ fn user_entrypoint(len: usize) -> usize {
         Entry::SetApprovalForAll { operator, approved } => {
             flush_guard(|| set_approval_for_all(operator.into(), approved))
         }
-    });
+    };
     0
 }
