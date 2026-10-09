@@ -28,6 +28,7 @@ jobs:
       - name: Initialize submodules
         run: |
           git submodule update --init --depth 1 forge-libs/forge-std
+          git submodule update --init --depth 1 forge-libs/solady
           git submodule update --init --depth 1 e2e-test/superposition-precompiles
 
       - name: Install Rust
@@ -61,7 +62,7 @@ jobs:
 
       - name: Install ArbOS Foundry
         env:
-          ARBOS_FOUNDRY_VERSION: v0.1.1
+          ARBOS_FOUNDRY_VERSION: v0.2.2
         run: |
           curl --fail --location --silent --show-error \
             "https://github.com/iosiro/arbos-foundry/releases/download/${ARBOS_FOUNDRY_VERSION}/arbos-foundry_${ARBOS_FOUNDRY_VERSION}_linux_amd64.tar.gz" \
