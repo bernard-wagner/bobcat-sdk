@@ -27,6 +27,7 @@ contract TracingCounter is Test {
         ));
     }
 
+    /// forge-config: default.isolate = false
     function testFuzz_counter(uint256 x) public {
         vm.assume(uint256(type(uint32).max) > x);
         SetTransient t = new SetTransient();
